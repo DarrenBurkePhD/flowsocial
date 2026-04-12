@@ -10,12 +10,6 @@ export async function POST(req: NextRequest) {
   try {
     const { package_id, profile_id, content_pieces } = await req.json();
 
-// Save buffer_profile_id to brand for future use
-await supabase
-  .from("brands")
-  .update({ buffer_profile_id: profile_id })
-  .eq("id", pkg?.brand_id);
-
     // Fetch content package
     const { data: pkg, error } = await supabase
       .from("content_packages")
@@ -24,6 +18,12 @@ await supabase
       .single();
 
     if (error || !pkg) throw new Error("Content package not found");
+
+    // Save buffer_profile_id to brand for future use
+    await supabase
+      .from("brands")
+      .update({ buffer_profile_id: profile_id })
+      .eq("id", pkg.brand_id);
 
     const pieces = (content_pieces || pkg.content_pieces) as Array<{
       status: string;
@@ -39,7 +39,10 @@ await supabase
     const approved = pieces.filter((p) => p.status === "approved");
 
     if (approved.length === 0) {
-      return NextResponse.json({ error: "No approved content to push" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No approved content to push" },
+        { status: 400 }
+      );
     }
 
     const results = [];
@@ -47,34 +50,48 @@ await supabase
 
     for (const piece of approved) {
       try {
-        // Build the full caption with hashtags and CTA
-        const fullCaption = `${piece.caption}\n\n${piece.cta}\n\n${piece.hashtags.map((h) => `#${h.replace("#", "")}`).join(" ")}`;
+        const cleanHashtags = piece.hashtags
+          .map((h) => `#${h.replace(/#/g, "")}`)
+          .join(" ");
 
-        // Schedule datetime
-        const scheduledAt = new Date(`${piece.post_date}T${piece.posting_time}:00`);
+        const fullCaption = `${piece.caption}\n\n${piece.cta}\n\n${cleanHashtags}`;
+
+        const scheduledAt = new Date(
+          `${piece.post_date}T${piece.posting_time}:00`
+        );
         const scheduledTimestamp = Math.floor(scheduledAt.getTime() / 1000);
 
-        // Push to Buffer
+        const params = new URLSearchParams({
+          access_token: process.env.BUFFER_ACCESS_TOKEN!,
+          "profile_ids[]": profile_id,
+          text: fullCaption,
+          scheduled_at: scheduledTimestamp.toString(),
+        });
+
+        if (piece.image_url) {
+          params.append("media[photo]", piece.image_url);
+        }
+
         const bufferRes = await fetch(
           "https://api.bufferapp.com/1/updates/create.json",
           {
             method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-              access_token: process.env.BUFFER_ACCESS_TOKEN!,
-              profile_ids: profile_id,
-              text: fullCaption,
-              scheduled_at: scheduledTimestamp.toString(),
-              ...(piece.image_url ? { media: JSON.stringify({ photo: piece.image_url }) } : {}),
-            }),
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: params,
           }
         );
 
         const bufferData = await bufferRes.json();
 
-        if (!bufferRes.ok) throw new Error(bufferData.message || "Buffer error");
+        if (!bufferRes.ok)
+          throw new Error(bufferData.message || "Buffer error");
 
-        results.push({ post_date: piece.post_date, buffer_id: bufferData.id });
+        results.push({
+          post_date: piece.post_date,
+          buffer_id: bufferData.id,
+        });
       } catch (err) {
         failures.push({
           post_date: piece.post_date,
@@ -86,7 +103,9 @@ await supabase
     // Update package status in Supabase
     await supabase
       .from("content_packages")
-      .update({ status: failures.length === 0 ? "scheduled" : "partial" })
+      .update({
+        status: failures.length === 0 ? "scheduled" : "partial",
+      })
       .eq("id", package_id);
 
     return NextResponse.json({
