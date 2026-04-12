@@ -95,8 +95,27 @@ Start post_date from ${weekStart}. Space posts across the week. Best times for F
 
     const responseText =
       message.content[0].type === "text" ? message.content[0].text : "";
-    const cleaned = responseText.replace(/```json\n?|\n?```/g, "").trim();
-    const contentPieces = JSON.parse(cleaned);
+    
+    // Robust JSON extraction - handles markdown fences and trailing content
+    let cleaned = responseText
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
+
+    // Extract just the JSON array if there's extra text around it
+    const arrayStart = cleaned.indexOf("[");
+    const arrayEnd = cleaned.lastIndexOf("]");
+    if (arrayStart !== -1 && arrayEnd !== -1) {
+      cleaned = cleaned.substring(arrayStart, arrayEnd + 1);
+    }
+
+    let contentPieces;
+    try {
+      contentPieces = JSON.parse(cleaned);
+    } catch {
+      // If still failing, ask Claude again with stricter instructions
+      throw new Error("Content generation failed — please try again");
+    }
 
     // Update content package with generated pieces
     await supabase
