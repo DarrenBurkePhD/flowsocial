@@ -21,16 +21,16 @@ export async function POST(req: NextRequest) {
       psychographics,
       brand_voice,
       reference_accounts,
+      buffer_profile_id,
     } = body;
 
-    // Call Claude to analyze the brand
     const message = await anthropic.messages.create({
       model: "claude-opus-4-5",
       max_tokens: 2000,
       messages: [
         {
           role: "user",
-          content: `You are a premium CPG brand strategist. Analyze this brand and produce a structured brand DNA document that will guide Instagram content creation.
+          content: `You are a premium Food & Beverage brand strategist specializing in sports nutrition and wellness brands. Analyze this brand and produce a structured brand DNA document that will guide Instagram content creation.
 
 Brand name: ${brand_name}
 Description: ${brand_description}
@@ -53,17 +53,18 @@ Return ONLY a valid JSON object with exactly these keys:
   "cta_library": ["cta 1", "cta 2", "cta 3", "cta 4", "cta 5"]
 }
 
-Be specific to THIS brand. Never use generic marketing language.`,
+Rules: No em dashes in any text. Be specific to this brand. No generic marketing language.`,
         },
       ],
     });
 
-    // Parse Claude's response
-    const responseText = message.content[0].type === "text" ? message.content[0].text : "";
-    const cleanedResponse = responseText.replace(/```json\n?|\n?```/g, "").trim();
+    const responseText =
+      message.content[0].type === "text" ? message.content[0].text : "";
+    const cleanedResponse = responseText
+      .replace(/```json\n?|\n?```/g, "")
+      .trim();
     const brandAnalysis = JSON.parse(cleanedResponse);
 
-    // Save to Supabase
     const { data: brand, error } = await supabase
       .from("brands")
       .insert({
@@ -77,6 +78,7 @@ Be specific to THIS brand. Never use generic marketing language.`,
         content_pillars: brandAnalysis.content_pillars,
         tone_guidelines: brandAnalysis.tone_guidelines,
         hashtag_strategy: brandAnalysis.hashtag_strategy,
+        buffer_profile_id: buffer_profile_id || null,
         onboarding_complete: true,
       })
       .select()

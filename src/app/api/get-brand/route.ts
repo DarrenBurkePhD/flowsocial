@@ -12,12 +12,15 @@ export async function GET(req: NextRequest) {
     const brand_id = searchParams.get("brand_id");
 
     if (!brand_id) {
-      return NextResponse.json({ error: "brand_id required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "brand_id required" },
+        { status: 400 }
+      );
     }
 
     const { data: brand, error } = await supabase
       .from("brands")
-      .select("id, brand_name, brand_description")
+      .select("id, brand_name, brand_description, buffer_profile_id")
       .eq("id", brand_id)
       .single();
 

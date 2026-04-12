@@ -32,6 +32,7 @@ export default function OnboardingPage() {
     psychographics: [] as string[],
     brand_voice: [] as string[],
     reference_accounts: ["", "", ""],
+    buffer_profile_id: "",
   });
 
   function updateField(field: string, value: unknown) {
@@ -96,7 +97,7 @@ export default function OnboardingPage() {
                 type="text"
                 value={form.brand_name}
                 onChange={(e) => updateField("brand_name", e.target.value)}
-                placeholder="e.g. Saltair"
+                placeholder="e.g. Headstrong"
                 className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
               />
             </div>
@@ -107,7 +108,7 @@ export default function OnboardingPage() {
               <textarea
                 value={form.brand_description}
                 onChange={(e) => updateField("brand_description", e.target.value)}
-                placeholder="e.g. We make mineral-rich body care for people who treat their skin like their face."
+                placeholder="e.g. We make brain-first supplements for contact sport athletes."
                 rows={3}
                 className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black resize-none"
               />
@@ -121,6 +122,21 @@ export default function OnboardingPage() {
                 placeholder="https://yourbrand.com"
                 className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Buffer Profile ID
+              </label>
+              <input
+                type="text"
+                value={form.buffer_profile_id}
+                onChange={(e) => updateField("buffer_profile_id", e.target.value)}
+                placeholder="e.g. 68a9f9053d2fbc20d49ad446"
+                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Find this in your Buffer URL: buffer.com/channels/YOUR-ID/schedule
+              </p>
             </div>
             <button
               onClick={() => setStep(2)}
@@ -234,7 +250,7 @@ export default function OnboardingPage() {
                   type="text"
                   value={account}
                   onChange={(e) => updateReferenceAccount(i, e.target.value)}
-                  placeholder={`@handle`}
+                  placeholder="@handle"
                   className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black mb-2"
                 />
               ))}
