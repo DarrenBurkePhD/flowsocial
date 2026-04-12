@@ -113,14 +113,25 @@ export default function DashboardPage() {
     }
   }
 
-  function toggleApprove(index: number) {
+  async function toggleApprove(index: number) {
     if (!contentPackage) return;
     const updated = [...contentPackage.content_pieces];
     updated[index] = {
       ...updated[index],
       status: updated[index].status === "approved" ? "pending" : "approved",
     };
-    setContentPackage({ ...contentPackage, content_pieces: updated });
+    const updatedPackage = { ...contentPackage, content_pieces: updated };
+    setContentPackage(updatedPackage);
+
+    // Persist approval status to Supabase
+    await fetch("/api/update-package", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        package_id: contentPackage.id,
+        content_pieces: updated,
+      }),
+    });
   }
 
   function saveCaption(index: number) {
@@ -410,8 +421,8 @@ export default function DashboardPage() {
                         )}
 
                         <p className="text-xs text-gray-400 mt-1">
-                          {piece.hashtags.slice(0, 5).map((h) => `#${h}`).join(" ")}
-                          {piece.hashtags.length > 5 && ` +${piece.hashtags.length - 5} more`}
+                          {piece.hashtags.slice(0, 5).map((h) => `#${h.replace(/#/g, "")}`).join(" ")}
+{piece.hashtags.length > 5 && ` +${piece.hashtags.length - 5} more`}
                         </p>
                       </div>
 

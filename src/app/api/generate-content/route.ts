@@ -65,6 +65,8 @@ CONTENT RULES FOR F&B BRANDS:
 - Athlete and community stories outperform product shots
 - Captions should sound like a founder talking to a friend
 - Never use: "game changer", "must-have", "self-care", "glow up"
+- Never use em dashes (—) in captions, use simple punctuation instead
+- Hashtags must be single words or joined words with no spaces, no # symbol included
 - First caption line must hook without mentioning product name
 - Sensory language wins: taste, feel, smell, texture, energy
 - For brain/performance brands: lead with the outcome not the ingredient
