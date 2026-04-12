@@ -8,7 +8,13 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { package_id, profile_id } = await req.json();
+    const { package_id, profile_id, content_pieces } = await req.json();
+
+// Save buffer_profile_id to brand for future use
+await supabase
+  .from("brands")
+  .update({ buffer_profile_id: profile_id })
+  .eq("id", pkg?.brand_id);
 
     // Fetch content package
     const { data: pkg, error } = await supabase
@@ -19,7 +25,7 @@ export async function POST(req: NextRequest) {
 
     if (error || !pkg) throw new Error("Content package not found");
 
-    const pieces = pkg.content_pieces as Array<{
+    const pieces = (content_pieces || pkg.content_pieces) as Array<{
       status: string;
       caption: string;
       hashtags: string[];
