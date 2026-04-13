@@ -4,8 +4,30 @@ export default function Home() {
   return (
     <main style={{ fontFamily: "'DM Sans', sans-serif", background: "#0A0A0A", color: "#F0EDE6", minHeight: "100vh" }}>
 
+      <style>{`
+        @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        .fs-ticker { display: flex; gap: 64px; animation: ticker 20s linear infinite; white-space: nowrap; }
+        .fs-proof { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+        .fs-proof-quote { font-family: 'DM Serif Display', serif; font-size: 22px; line-height: 1.4; color: #D4C9B8; font-style: italic; }
+        .fs-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 2px; margin-top: 48px; }
+        .fs-footer { display: flex; align-items: center; justify-content: space-between; }
+        .fs-footer-copy { font-size: 12px; color: #4A4845; }
+        @media (max-width: 600px) {
+          .fs-nav { padding: 20px 24px !important; }
+          .fs-hero { padding: 60px 24px 48px !important; }
+          .fs-section { padding: 60px 24px !important; }
+          .fs-section-notop { padding: 0 24px 60px !important; }
+          .fs-proof { grid-template-columns: 1fr !important; gap: 32px !important; padding: 32px 24px !important; }
+          .fs-proof-quote { font-size: 15px !important; line-height: 1.5 !important; }
+          .fs-step-first { border-radius: 12px 12px 0 0 !important; }
+          .fs-step-last { border-radius: 0 0 12px 12px !important; }
+          .fs-footer { flex-direction: column !important; gap: 6px !important; padding: 24px !important; align-items: flex-start !important; }
+          .fs-footer-copy { font-size: 11px !important; }
+        }
+      `}</style>
+
       {/* Nav */}
-      <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "28px 48px", borderBottom: "0.5px solid rgba(240,237,230,0.1)" }}>
+      <nav className="fs-nav" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "28px 48px", borderBottom: "0.5px solid rgba(240,237,230,0.1)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
             <rect width="32" height="32" rx="8" fill="#C4A882"/>
@@ -24,7 +46,7 @@ export default function Home() {
       </nav>
 
       {/* Hero */}
-      <div style={{ padding: "100px 48px 80px", maxWidth: "900px" }}>
+      <div className="fs-hero" style={{ padding: "100px 48px 80px", maxWidth: "900px" }}>
         <div style={{ fontSize: "12px", fontWeight: 500, letterSpacing: "2px", textTransform: "uppercase", color: "#8B7355", marginBottom: "28px" }}>
           AI-powered Instagram engine
         </div>
@@ -53,18 +75,7 @@ export default function Home() {
 
       {/* Ticker */}
       <div style={{ borderTop: "0.5px solid rgba(240,237,230,0.08)", borderBottom: "0.5px solid rgba(240,237,230,0.08)", padding: "16px 0", margin: "60px 0 0", overflow: "hidden" }}>
-        <style>{`
-          @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-          .fs-ticker { display: flex; gap: 64px; animation: ticker 20s linear infinite; whiteSpace: nowrap; }
-          .fs-ticker-item { fontSize: 12px; fontWeight: 500; letterSpacing: 1.5px; textTransform: uppercase; color: rgba(240,237,230,0.3); flexShrink: 0; }
-          @media (max-width: 600px) {
-            .fs-nav { padding: 20px 24px !important; }
-            .fs-hero { padding: 60px 24px 48px !important; }
-            .fs-section { padding: 60px 24px !important; }
-            .fs-proof { grid-template-columns: 1fr !important; gap: 32px !important; padding: 32px 24px !important; }
-          }
-        `}</style>
-        <div style={{ display: "flex", gap: "64px", animation: "ticker 20s linear infinite", whiteSpace: "nowrap" }}>
+        <div className="fs-ticker">
           {["Brand DNA analysis", "7 posts in 30 seconds", "Auto-scheduled to Instagram", "AI-generated imagery", "On-brand every time", "No agency needed",
             "Brand DNA analysis", "7 posts in 30 seconds", "Auto-scheduled to Instagram", "AI-generated imagery", "On-brand every time", "No agency needed"
           ].map((item, i) => (
@@ -76,23 +87,27 @@ export default function Home() {
       </div>
 
       {/* How it works */}
-      <div style={{ padding: "80px 48px" }}>
+      <div className="fs-section" style={{ padding: "80px 48px" }}>
         <div style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "2px", textTransform: "uppercase", color: "#8B7355", marginBottom: "20px" }}>How it works</div>
         <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "clamp(28px, 4vw, 44px)", lineHeight: 1.1, color: "#F0EDE6", margin: "0 0 16px" }}>
           Three steps to a full <em style={{ color: "#C4A882" }}>Instagram presence</em>
         </h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "2px", marginTop: "48px" }}>
+        <div className="fs-steps">
           {[
-            { num: "01", title: "Tell us your brand", desc: "Share your brand name, voice, audience, and a few reference accounts. Takes 3 minutes." },
-            { num: "02", title: "Generate your week", desc: "One click. Claude writes 7 days of on-brand captions, hashtags, and image prompts." },
-            { num: "03", title: "Approve and schedule", desc: "Review each post, generate images, hit approve. Flow Social schedules everything automatically." },
+            { num: "01", title: "Tell us your brand", desc: "Share your brand name, voice, audience, and a few reference accounts. Takes 3 minutes.", cls: "fs-step-first" },
+            { num: "02", title: "Generate your week", desc: "One click. Flow Social writes 7 days of on-brand posts ready for your review and approval.", cls: "" },
+            { num: "03", title: "Approve and schedule", desc: "Review each post, generate images, hit approve. Flow Social schedules everything automatically.", cls: "fs-step-last" },
           ].map((step, i) => (
-            <div key={i} style={{
-              background: "#111111",
-              padding: "36px 32px",
-              border: "0.5px solid rgba(240,237,230,0.06)",
-              borderRadius: i === 0 ? "12px 0 0 12px" : i === 2 ? "0 12px 12px 0" : "0"
-            }}>
+            <div
+              key={i}
+              className={step.cls}
+              style={{
+                background: "#111111",
+                padding: "36px 32px",
+                border: "0.5px solid rgba(240,237,230,0.06)",
+                borderRadius: i === 0 ? "12px 0 0 12px" : i === 2 ? "0 12px 12px 0" : "0"
+              }}
+            >
               <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "48px", color: "rgba(240,237,230,0.08)", lineHeight: 1, marginBottom: "20px" }}>{step.num}</div>
               <div style={{ fontSize: "15px", fontWeight: 500, color: "#F0EDE6", marginBottom: "10px" }}>{step.title}</div>
               <div style={{ fontSize: "13px", fontWeight: 300, color: "#6B6760", lineHeight: 1.6 }}>{step.desc}</div>
@@ -102,29 +117,28 @@ export default function Home() {
       </div>
 
       {/* Case study */}
-      <div style={{ padding: "0 48px 80px" }}>
+      <div className="fs-section-notop" style={{ padding: "0 48px 80px" }}>
         <div style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "2px", textTransform: "uppercase", color: "#8B7355", marginBottom: "20px" }}>Live case study</div>
-        <div style={{
-          background: "#0F0F0F",
-          border: "0.5px solid rgba(240,237,230,0.08)",
-          borderRadius: "16px",
-          padding: "48px",
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "48px",
-          alignItems: "center"
-        }}>
+        <div
+          className="fs-proof"
+          style={{
+            background: "#0F0F0F",
+            border: "0.5px solid rgba(240,237,230,0.08)",
+            borderRadius: "16px",
+            padding: "48px",
+          }}
+        >
           <div>
-            <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "22px", lineHeight: 1.4, color: "#D4C9B8", fontStyle: "italic" }}>
+            <div className="fs-proof-quote">
               "We went from posting twice a month to every single day and the content actually sounds like us."
             </div>
             <div style={{ fontSize: "12px", fontWeight: 500, letterSpacing: "1.5px", textTransform: "uppercase", color: "#8B7355", marginTop: "20px" }}>
-              Headstrong — Brain nutrition for contact sport athletes
+              Headstrong — Brain first sports nutrition for athletes in contact sport
             </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
             {[
-              { num: "7", label: "Posts generated in under 30 seconds" },
+              { num: "7", label: "Posts created in under 30 seconds" },
               { num: "100%", label: "On-brand, no editing required" },
               { num: "$0", label: "Spent on a social media manager" },
             ].map((stat, i) => (
@@ -138,7 +152,7 @@ export default function Home() {
       </div>
 
       {/* Pricing */}
-      <div style={{ padding: "0 48px 80px", textAlign: "center" }}>
+      <div className="fs-section-notop" style={{ padding: "0 48px 80px", textAlign: "center" }}>
         <div style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "2px", textTransform: "uppercase", color: "#8B7355", marginBottom: "20px" }}>Pricing</div>
         <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "clamp(28px, 4vw, 44px)", lineHeight: 1.1, color: "#F0EDE6", marginBottom: "40px" }}>
           Simple, founder-friendly <em style={{ color: "#C4A882" }}>pricing</em>
@@ -159,10 +173,10 @@ export default function Home() {
           <div style={{ fontSize: "14px", color: "#6B6760", marginBottom: "32px" }}>14-day free trial, no credit card required</div>
           <ul style={{ listStyle: "none", padding: 0, margin: "0 0 36px", textAlign: "left", display: "flex", flexDirection: "column", gap: "12px" }}>
             {[
-              "7 posts generated every week",
-              "AI image generation per post",
+              "7 posts for each week",
+              "AI powered image per post",
               "Auto-scheduling to Instagram via Buffer",
-              "Brand DNA that sounds like you",
+              "Your brands DNA every post",
               "Caption editing and regeneration",
               "Unlimited content packages",
             ].map((f, i) => (
@@ -183,7 +197,7 @@ export default function Home() {
       </div>
 
       {/* Footer */}
-      <footer style={{ borderTop: "0.5px solid rgba(240,237,230,0.08)", padding: "32px 48px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <footer className="fs-footer" style={{ borderTop: "0.5px solid rgba(240,237,230,0.08)", padding: "32px 48px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
             <rect width="32" height="32" rx="8" fill="#C4A882"/>
@@ -193,7 +207,7 @@ export default function Home() {
           </svg>
           <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: "14px", color: "#4A4845" }}>Flow Social</span>
         </div>
-        <div style={{ fontSize: "12px", color: "#4A4845" }}>© 2026 Flow Social. Built for founders.</div>
+        <div className="fs-footer-copy">© 2026 Flow Social. Built for founders.</div>
       </footer>
 
     </main>
