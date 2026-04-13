@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
     const { data: brand, error } = await supabase
       .from("brands")
-      .select("id, brand_name, brand_description, buffer_profile_id")
+      .select("id, brand_name, brand_description, buffer_profile_id, brand_dna")
       .eq("id", brand_id)
       .eq("user_id", user.id)
       .single();

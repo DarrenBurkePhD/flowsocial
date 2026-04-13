@@ -24,7 +24,14 @@ type Brand = {
   brand_name: string;
   brand_description: string;
   buffer_profile_id?: string;
-  brand_dna?: { image_style?: string };
+  brand_dna?: {
+    image_style?: string;
+    image_preferences?: {
+      color?: string;
+      people?: string;
+      finish?: string;
+    };
+  };
 };
 
 type ContentPackage = {
@@ -125,6 +132,7 @@ export default function DashboardPage() {
           image_prompt: piece.image_prompt,
           content_type: piece.content_type,
           image_style: brand?.brand_dna?.image_style || "",
+          image_preferences: brand?.brand_dna?.image_preferences || {},
         }),
       });
       const data = await res.json();
@@ -247,8 +255,7 @@ export default function DashboardPage() {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <button
-            onClick={() => router.push(`/settings/${brand_id}`)}
+          <button onClick={() => router.push(`/settings/${brand_id}`)}
             style={{ background: "transparent", color: "#6B6760", border: "0.5px solid rgba(240,237,230,0.1)", borderRadius: "100px", padding: "8px 16px", fontSize: "12px", cursor: "pointer", fontFamily: "inherit" }}>
             Settings
           </button>
@@ -311,7 +318,6 @@ export default function DashboardPage() {
                       <div style={{ fontSize: "10px", color: "#3A3835", marginTop: "2px" }}>{piece.posting_time}</div>
                     </div>
 
-                    {/* Image with hover regenerate */}
                     <div
                       className="img-wrap"
                       style={{ width: "76px", height: "76px", borderRadius: "8px", background: "#1A1A18", flexShrink: 0, overflow: "hidden", position: "relative" }}
@@ -325,13 +331,7 @@ export default function DashboardPage() {
                       ) : piece.image_url ? (
                         <>
                           <img src={piece.image_url} alt={piece.concept} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          {/* Hover overlay with regenerate button */}
-                          <div
-                            className="regen-btn"
-                            style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-                            onClick={() => generateImage(index)}
-                            title="Generate new image"
-                          >
+                          <div className="regen-btn" style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} onClick={() => generateImage(index)} title="Generate new image">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F0EDE6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
                               <path d="M21 3v5h-5"/>

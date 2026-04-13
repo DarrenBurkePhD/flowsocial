@@ -13,15 +13,26 @@ type ImageSize = "1024x1024" | "1792x1024" | "1024x1792";
 
 export async function POST(req: NextRequest) {
   try {
-    const { image_prompt, content_type, image_style } = await req.json();
+    const { image_prompt, content_type, image_style, image_preferences } = await req.json();
 
     const size: ImageSize = content_type === "story" ? "1024x1792" : "1024x1024";
 
     const styleGuide = image_style
       ? `Photography style: ${image_style}`
-      : "Premium lifestyle photography. Clean, editorial, high-end consumer brand aesthetic. Natural lighting. Real people or products, not illustrated.";
+      : "Premium lifestyle photography. Clean, editorial, high-end consumer brand aesthetic. Natural lighting.";
 
-    const fullPrompt = `${image_prompt}. ${styleGuide}. No text overlays, no words, no labels, no logos in the image. No supplement bottles, no product packaging, no branded containers, no generic product shots. Photorealistic lifestyle photography only. Shot on high-end camera. Instagram-ready.`;
+    // Hard enforce people preference
+    const peoplePreference = image_preferences?.people || "mix";
+    let peopleRule = "";
+    if (peoplePreference === "no_people") {
+      peopleRule = "IMPORTANT: No people, no humans, no body parts, no faces, no hands. Strictly environments, textures, objects, and abstract scenes only.";
+    } else if (peoplePreference === "athletes") {
+      peopleRule = "Feature athletes and active people in training or sport environments only.";
+    } else if (peoplePreference === "lifestyle_people") {
+      peopleRule = "Feature real people in everyday lifestyle moments.";
+    }
+
+    const fullPrompt = `${image_prompt}. ${styleGuide}. ${peopleRule} No text overlays, no words, no labels, no logos in the image. No supplement bottles, no product packaging, no branded containers, no generic product shots. Photorealistic. Shot on high-end camera. Instagram-ready.`.trim();
 
     const response = await openai.images.generate({
       model: "dall-e-3",
