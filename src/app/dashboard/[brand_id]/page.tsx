@@ -150,6 +150,15 @@ export default function DashboardPage() {
 
   async function toggleApprove(index: number) {
     if (!contentPackage || approvingIndex === index) return;
+
+    const piece = contentPackage.content_pieces[index];
+
+    // Block approval if no image
+    if (piece.status !== "approved" && !piece.image_url) {
+      showMessage("Add an image first — Instagram requires one before scheduling.", "error");
+      return;
+    }
+
     setApprovingIndex(index);
 
     const updated = [...contentPackage.content_pieces];
@@ -157,10 +166,8 @@ export default function DashboardPage() {
     updated[index] = { ...updated[index], status: newStatus };
     setContentPackage({ ...contentPackage, content_pieces: updated });
 
-    // Persist to Supabase
     await persistPieces(contentPackage.id, updated);
 
-    // Auto-schedule in Buffer on approval
     if (newStatus === "approved") {
       if (!brand?.buffer_profile_id) {
         showMessage("Approved locally. Add your Buffer Profile ID to auto-schedule.", "error");
@@ -169,13 +176,11 @@ export default function DashboardPage() {
       }
 
       try {
-        const piece = updated[index];
         const cleanHashtags = piece.hashtags
           .map((h: string) => `#${h.replace(/#/g, "")}`)
           .join(" ");
         const fullCaption = `${piece.caption}\n\n${piece.cta}\n\n${cleanHashtags}`;
 
-        // Use the post_date and posting_time assigned by Claude
         const scheduledAt = new Date(`${piece.post_date}T${piece.posting_time}:00`);
         const scheduledTimestamp = Math.floor(scheduledAt.getTime() / 1000);
 
@@ -193,15 +198,11 @@ export default function DashboardPage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
 
-        // Save buffer_id back to the piece
         updated[index] = { ...updated[index], buffer_id: data.buffer_id };
         setContentPackage({ ...contentPackage, content_pieces: updated });
         await persistPieces(contentPackage.id, updated);
 
-        showMessage(
-          `Scheduled for ${piece.post_date} at ${piece.posting_time}`,
-          "success"
-        );
+        showMessage(`Scheduled for ${piece.post_date} at ${piece.posting_time}`, "success");
       } catch (err: unknown) {
         showMessage(
           err instanceof Error ? err.message : "Buffer scheduling failed",
@@ -227,9 +228,7 @@ export default function DashboardPage() {
   const approvedCount =
     contentPackage?.content_pieces.filter((p) => p.status === "approved").length ?? 0;
 
-  const weekDates = contentPackage
-    ? getWeekDates(contentPackage.week_start_date)
-    : [];
+  const weekDates = contentPackage ? getWeekDates(contentPackage.week_start_date) : [];
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -238,9 +237,7 @@ export default function DashboardPage() {
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-gray-900">FlowSocial</h1>
-            {brand && (
-              <p className="text-sm text-gray-500">{brand.brand_name}</p>
-            )}
+            {brand && <p className="text-sm text-gray-500">{brand.brand_name}</p>}
           </div>
           <button
             onClick={generateContent}
@@ -274,8 +271,7 @@ export default function DashboardPage() {
               Ready to generate your first week
             </h2>
             <p className="text-gray-500 mb-2">
-              One click creates 7 days of premium Instagram content for{" "}
-              {brand?.brand_name}
+              One click creates 7 days of premium Instagram content for {brand?.brand_name}
             </p>
             <p className="text-sm text-gray-400 mb-8">
               Approve each post to automatically schedule it in Buffer
@@ -311,7 +307,7 @@ export default function DashboardPage() {
                   Week of {contentPackage.week_start_date}
                 </h2>
                 <p className="text-sm text-gray-400 mt-0.5">
-                  Approve a post to automatically schedule it in Buffer
+                  Add an image then approve to schedule in Buffer
                 </p>
               </div>
               <div className="text-sm font-medium text-gray-900">
@@ -324,9 +320,7 @@ export default function DashboardPage() {
                 <div
                   key={index}
                   className={`bg-white rounded-xl border transition-all ${
-                    piece.status === "approved"
-                      ? "border-green-300"
-                      : "border-gray-100"
+                    piece.status === "approved" ? "border-green-300" : "border-gray-100"
                   }`}
                 >
                   <div className="p-5">
@@ -343,9 +337,7 @@ export default function DashboardPage() {
                         <div className="text-xs text-gray-400 uppercase">
                           {weekDates[(piece.day - 1) % 7]?.month ?? ""}
                         </div>
-                        <div className="text-xs text-gray-400">
-                          {piece.posting_time}
-                        </div>
+                        <div className="text-xs text-gray-400">{piece.posting_time}</div>
                       </div>
 
                       {/* Image */}
@@ -390,9 +382,7 @@ export default function DashboardPage() {
                           )}
                         </div>
 
-                        <p className="text-xs text-gray-400 italic mb-1">
-                          {piece.concept}
-                        </p>
+                        <p className="text-xs text-gray-400 italic mb-1">{piece.concept}</p>
 
                         {selectedPiece === index ? (
                           <div>
@@ -446,6 +436,8 @@ export default function DashboardPage() {
                         className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                           piece.status === "approved"
                             ? "bg-green-500 text-white hover:bg-green-600"
+                            : !piece.image_url
+                            ? "border border-gray-100 text-gray-300 cursor-not-allowed"
                             : "border border-gray-200 text-gray-600 hover:border-gray-400"
                         } disabled:opacity-50`}
                       >
@@ -453,8 +445,11 @@ export default function DashboardPage() {
                           ? "Scheduling..."
                           : piece.status === "approved"
                           ? "✓ Scheduled"
+                          : !piece.image_url
+                          ? "Add image first"
                           : "Approve"}
                       </button>
+
                     </div>
                   </div>
                 </div>

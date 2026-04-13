@@ -4,6 +4,13 @@ export async function POST(req: NextRequest) {
   try {
     const { profile_id, text, scheduled_at, image_url } = await req.json();
 
+    if (!image_url) {
+      return NextResponse.json(
+        { error: "Instagram requires an image. Please add an image before approving." },
+        { status: 400 }
+      );
+    }
+
     const dueAt = new Date(scheduled_at * 1000).toISOString();
 
     const mutation = `
@@ -13,7 +20,9 @@ export async function POST(req: NextRequest) {
           text: ${JSON.stringify(text)},
           schedulingType: automatic,
           mode: customScheduled,
-          dueAt: "${dueAt}"
+          dueAt: "${dueAt}",
+          postType: post,
+          mediaUrls: [${JSON.stringify(image_url)}]
         }) {
           ... on PostActionSuccess {
             post {
@@ -49,7 +58,6 @@ export async function POST(req: NextRequest) {
     const result = bufferData.data?.createPost;
 
     if (result?.message) {
-      // MutationError
       return NextResponse.json({ error: result.message }, { status: 400 });
     }
 
