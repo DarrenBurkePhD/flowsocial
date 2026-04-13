@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const { profile_id, text, scheduled_at, image_url } = await req.json();
+    const { profile_id, text, scheduled_at, image_url, content_type } = await req.json();
 
     if (!image_url) {
       return NextResponse.json(
@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
     }
 
     const dueAt = new Date(scheduled_at * 1000).toISOString();
+    const instagramType = content_type === "story" ? "story" : "post";
 
     const mutation = `
       mutation CreatePost {
@@ -25,6 +26,11 @@ export async function POST(req: NextRequest) {
             images: [
               { url: ${JSON.stringify(image_url)} }
             ]
+          },
+          serviceData: {
+            instagram: {
+              type: ${instagramType}
+            }
           }
         }) {
           ... on PostActionSuccess {

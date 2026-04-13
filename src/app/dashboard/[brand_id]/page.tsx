@@ -188,11 +188,12 @@ export default function DashboardPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            profile_id: brand.buffer_profile_id,
-            text: fullCaption,
-            scheduled_at: scheduledTimestamp,
-            image_url: piece.image_url || null,
-          }),
+  profile_id: brand.buffer_profile_id,
+  text: fullCaption,
+  scheduled_at: scheduledTimestamp,
+  image_url: piece.image_url || null,
+  content_type: piece.content_type,
+}),
         });
 
         const data = await res.json();
