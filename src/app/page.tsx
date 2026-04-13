@@ -95,8 +95,8 @@ export default function Home() {
         <div className="fs-steps">
           {[
             { num: "01", title: "Tell us your brand", desc: "Share your brand name, voice, audience, and a few reference accounts. Takes 3 minutes.", cls: "fs-step-first" },
-            { num: "02", title: "Generate your week", desc: "One click. Flow Social creates 7 days of on-brand posts ready for your review.", cls: "" },
-            { num: "03", title: "Approve and schedule", desc: "Review each post, generate images, hit approve. Your posts gets scheduled.", cls: "fs-step-last" },
+            { num: "02", title: "Generate your week", desc: "One click. Flow Social creates 7 days of on brand posts ready for your review.", cls: "" },
+            { num: "03", title: "Approve and schedule", desc: "Review each post, generate images, hit approve. Your posts get scheduled.", cls: "fs-step-last" },
           ].map((step, i) => (
             <div
               key={i}
@@ -130,7 +130,7 @@ export default function Home() {
         >
           <div>
             <div className="fs-proof-quote">
-              "We went from posting twice a month to every day, and with curated, on brand, engaging content."
+              "We went from posting twice a month to every day, and with curated, engaging content."
             </div>
             <div style={{ fontSize: "12px", fontWeight: 500, letterSpacing: "1.5px", textTransform: "uppercase", color: "#8B7355", marginTop: "20px" }}>
               Headstrong — Brain first sports nutrition for athletes
@@ -139,7 +139,7 @@ export default function Home() {
           <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
             {[
               { num: "7", label: "Posts created in under 30 seconds" },
-              { num: "100%", label: "On-brand, no editing required" },
+              { num: "100%", label: "On brand, no editing required" },
               { num: "$0", label: "Spent on a social media manager" },
             ].map((stat, i) => (
               <div key={i} style={{ borderLeft: "1px solid rgba(196,168,130,0.3)", paddingLeft: "20px" }}>
@@ -155,7 +155,7 @@ export default function Home() {
       <div className="fs-section-notop" style={{ padding: "0 48px 80px", textAlign: "center" }}>
         <div style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "2px", textTransform: "uppercase", color: "#8B7355", marginBottom: "20px" }}>Pricing</div>
         <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "clamp(28px, 4vw, 44px)", lineHeight: 1.1, color: "#F0EDE6", marginBottom: "40px" }}>
-          Simple, founder-friendly <em style={{ color: "#C4A882" }}>pricing</em>
+          Founder-friendly <em style={{ color: "#C4A882" }}>pricing</em>
         </h2>
         <div style={{
           background: "#111111",
@@ -170,7 +170,7 @@ export default function Home() {
           <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "64px", color: "#F0EDE6", lineHeight: 1, margin: "24px 0 8px" }}>
             $97<span style={{ fontSize: "20px", color: "#6B6760" }}>/mo</span>
           </div>
-          <div style={{ fontSize: "14px", color: "#6B6760", marginBottom: "32px" }}>14-day free trial, no credit card required</div>
+          <div style={{ fontSize: "14px", color: "#6B6760", marginBottom: "32px" }}>14-day free trial</div>
           <ul style={{ listStyle: "none", padding: 0, margin: "0 0 36px", textAlign: "left", display: "flex", flexDirection: "column", gap: "12px" }}>
             {[
               "7 posts for each week",
