@@ -2,36 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const { profile_id, text, image_url } = await req.json();
-
-    if (!image_url) {
-      return NextResponse.json(
-        { error: "Instagram requires an image. Please add an image before approving." },
-        { status: 400 }
-      );
-    }
-
-    const mutation = `
-      mutation CreatePost {
-        createPost(input: {
-          channelId: "${profile_id}",
-          text: ${JSON.stringify(text)},
-          schedulingType: automatic,
-          mode: addToQueue,
-          assets: {
-            images: [
-              { url: ${JSON.stringify(image_url)} }
-            ]
-          }
-        }) {
-          ... on PostActionSuccess {
-            post {
-              id
-              dueAt
+    const introspection = `
+      query {
+        __type(name: "CreatePostInput") {
+          inputFields {
+            name
+            type {
+              name
+              kind
+              ofType {
+                name
+                kind
+              }
             }
-          }
-          ... on MutationError {
-            message
           }
         }
       }
@@ -43,34 +26,15 @@ export async function POST(req: NextRequest) {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${process.env.BUFFER_ACCESS_TOKEN}`,
       },
-      body: JSON.stringify({ query: mutation }),
+      body: JSON.stringify({ query: introspection }),
     });
 
-    const bufferData = await bufferRes.json();
-
-    if (bufferData.errors) {
-      return NextResponse.json(
-        { error: bufferData.errors[0].message },
-        { status: 400 }
-      );
-    }
-
-    const result = bufferData.data?.createPost;
-
-    if (result?.message) {
-      return NextResponse.json({ error: result.message }, { status: 400 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      buffer_id: result?.post?.id,
-      scheduled_at: result?.post?.dueAt,
-    });
+    const data = await bufferRes.json();
+    return NextResponse.json(data);
 
   } catch (err: unknown) {
-    console.error("Buffer push error:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Buffer push failed" },
+      { error: err instanceof Error ? err.message : "failed" },
       { status: 500 }
     );
   }
