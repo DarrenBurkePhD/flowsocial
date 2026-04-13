@@ -21,18 +21,22 @@ export async function POST(req: NextRequest) {
       ? `Photography style: ${image_style}`
       : "Premium lifestyle photography. Clean, editorial, high-end consumer brand aesthetic. Natural lighting.";
 
-    // Hard enforce people preference
     const peoplePreference = image_preferences?.people || "mix";
-    let peopleRule = "";
-    if (peoplePreference === "no_people") {
-      peopleRule = "IMPORTANT: No people, no humans, no body parts, no faces, no hands. Strictly environments, textures, objects, and abstract scenes only.";
-    } else if (peoplePreference === "athletes") {
-      peopleRule = "Feature athletes and active people in training or sport environments only.";
-    } else if (peoplePreference === "lifestyle_people") {
-      peopleRule = "Feature real people in everyday lifestyle moments.";
-    }
 
-    const fullPrompt = `${image_prompt}. ${styleGuide}. ${peopleRule} No text overlays, no words, no labels, no logos in the image. No supplement bottles, no product packaging, no branded containers, no generic product shots. Photorealistic. Shot on high-end camera. Instagram-ready.`.trim();
+    let fullPrompt = "";
+
+    if (peoplePreference === "no_people") {
+      // Lead with the hard restriction so DALL-E processes it first
+      fullPrompt = `STRICT RULE: This image must contain absolutely zero humans, zero people, zero body parts including legs, feet, hands, arms, torso or face. No human presence of any kind whatsoever. ${image_prompt}. Reframe this concept as: equipment, surfaces, textures, environments, abstract motion, light, shadow, or objects only. ${styleGuide}. No text, no logos, no product packaging. Photorealistic. Instagram-ready.`;
+    } else {
+      let peopleRule = "";
+      if (peoplePreference === "athletes") {
+        peopleRule = "Feature athletes and active people in training or sport environments.";
+      } else if (peoplePreference === "lifestyle_people") {
+        peopleRule = "Feature real people in everyday lifestyle moments.";
+      }
+      fullPrompt = `${image_prompt}. ${styleGuide}. ${peopleRule} No text overlays, no words, no labels, no logos. No supplement bottles, no product packaging, no branded containers. Photorealistic. Shot on high-end camera. Instagram-ready.`.trim();
+    }
 
     const response = await openai.images.generate({
       model: "dall-e-3",
