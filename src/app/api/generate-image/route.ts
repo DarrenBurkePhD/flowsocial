@@ -13,28 +13,31 @@ type ImageSize = "1024x1024" | "1792x1024" | "1024x1792";
 
 export async function POST(req: NextRequest) {
   try {
-    const { image_prompt, content_type } = await req.json();
+    const { image_prompt, content_type, image_style } = await req.json();
 
     const size: ImageSize = content_type === "story" ? "1024x1792" : "1024x1024";
 
-    // Step 1: Generate image with DALL-E
+    const styleGuide = image_style
+      ? `Photography style: ${image_style}`
+      : "Premium lifestyle photography. Clean, editorial, high-end consumer brand aesthetic. Natural lighting. Real people or products, not illustrated.";
+
+    const fullPrompt = `${image_prompt}. ${styleGuide}. No text overlays, no words, no labels, no logos in the image. Photorealistic, not illustrated or artistic. Shot on high-end camera. Instagram-ready.`;
+
     const response = await openai.images.generate({
       model: "dall-e-3",
-      prompt: `${image_prompt}. Premium lifestyle photography style. No text, no words, no labels in the image. Clean, editorial, high-end F&B brand aesthetic.`,
+      prompt: fullPrompt,
       n: 1,
-      size: size,
+      size,
       quality: "standard",
     });
 
     const tempUrl = response.data?.[0]?.url;
     if (!tempUrl) throw new Error("No image URL returned from DALL-E");
 
-    // Step 2: Download the image
     const imageRes = await fetch(tempUrl);
     if (!imageRes.ok) throw new Error("Failed to download image from DALL-E");
     const imageBuffer = await imageRes.arrayBuffer();
 
-    // Step 3: Upload to Supabase Storage
     const filename = `posts/${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
     const { error: uploadError } = await supabase.storage
       .from("media")
@@ -45,15 +48,11 @@ export async function POST(req: NextRequest) {
 
     if (uploadError) throw new Error(`Supabase upload failed: ${uploadError.message}`);
 
-    // Step 4: Get permanent public URL
     const { data: publicUrlData } = supabase.storage
       .from("media")
       .getPublicUrl(filename);
 
-    const permanentUrl = publicUrlData.publicUrl;
-    if (!permanentUrl) throw new Error("Failed to get public URL from Supabase");
-
-    return NextResponse.json({ image_url: permanentUrl });
+    return NextResponse.json({ image_url: publicUrlData.publicUrl });
 
   } catch (err: unknown) {
     console.error("Image generation error:", err);
