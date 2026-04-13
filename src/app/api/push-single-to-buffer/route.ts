@@ -21,7 +21,11 @@ export async function POST(req: NextRequest) {
           schedulingType: automatic,
           mode: customScheduled,
           dueAt: "${dueAt}",
-          mediaUrls: [${JSON.stringify(image_url)}]
+          assets: {
+            images: [
+              { url: ${JSON.stringify(image_url)} }
+            ]
+          }
         }) {
           ... on PostActionSuccess {
             post {
