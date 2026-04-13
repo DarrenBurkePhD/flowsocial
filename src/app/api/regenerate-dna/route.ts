@@ -33,14 +33,12 @@ function buildImageStylePrompt(color: string, people: string, finish: string): s
     warm_golden: "warm golden-hour tones, rich amber and honey hues",
     dark_dramatic: "dark and dramatic lighting, deep shadows, high contrast moody tones",
   };
-
   const peopleMap: Record<string, string> = {
     no_people: "no people — product and lifestyle objects only, no human figures",
     athletes: "featuring athletes and active people in training or sport environments",
     lifestyle_people: "featuring real people in everyday lifestyle moments",
     mix: "alternating between product-focused shots and lifestyle shots with people",
   };
-
   const finishMap: Record<string, string> = {
     clean_clinical: "clean clinical aesthetic, sharp focus, precise composition, scientific precision",
     bright_airy: "bright and airy feel, lots of negative space, light and optimistic mood",
@@ -48,7 +46,6 @@ function buildImageStylePrompt(color: string, people: string, finish: string): s
     luxury_refined: "luxury and refined, aspirational, premium materials and surfaces",
     natural_organic: "natural and organic, earthy textures, wholesome and grounded",
   };
-
   return `${colorMap[color] || colorMap.full_color}. ${peopleMap[people] || peopleMap.mix}. ${finishMap[finish] || finishMap.clean_clinical}.`;
 }
 
@@ -79,12 +76,32 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const {
-      brand_name, brand_description, website_url,
-      age_range, gender, psychographics,
-      brand_voice, buffer_profile_id,
-      image_color, image_people, image_finish,
+      brand_id,
+      brand_name,
+      brand_description,
+      website_url,
+      age_range,
+      gender,
+      psychographics,
+      brand_voice,
+      image_color,
+      image_people,
+      image_finish,
     } = body;
 
+    // Verify ownership
+    const { data: existing } = await supabaseAdmin
+      .from("brands")
+      .select("id")
+      .eq("id", brand_id)
+      .eq("user_id", user.id)
+      .single();
+
+    if (!existing) {
+      return NextResponse.json({ error: "Brand not found" }, { status: 404 });
+    }
+
+    // Scrape website
     let websiteContent = "";
     if (website_url) {
       websiteContent = await scrapeWebsite(website_url);
@@ -111,16 +128,10 @@ BRAND INFORMATION:
 Brand name: ${brand_name}
 Founder description: ${brand_description}
 Target audience: ${age_range}, ${gender}
-Customer psychographics: ${psychographics.join(", ")}
-Brand voice: ${brand_voice.join(", ")}
+Customer psychographics: ${psychographics?.join(", ")}
+Brand voice: ${brand_voice?.join(", ")}
 Image style preferences: ${imageStylePrompt}
 ${websiteSection}
-
-Using ALL of the above especially the scraped website content, identify:
-- The actual products and what makes them unique
-- The real brand language and tone from the website copy
-- The specific customer problems being solved
-- The brand values and mission
 
 Return ONLY a valid JSON object with exactly these keys:
 {
@@ -128,8 +139,8 @@ Return ONLY a valid JSON object with exactly these keys:
   "products": ["specific product 1", "specific product 2", "specific product 3"],
   "content_pillars": ["pillar 1", "pillar 2", "pillar 3", "pillar 4", "pillar 5"],
   "tone_guidelines": "2-3 sentences on how to write captions for this brand. Be specific about sentence length, vocabulary, and emotional register.",
-  "aesthetic_direction": "2-3 sentences describing the visual world of this brand. Include lighting, color palette, subject matter, and mood.",
-  "image_style": "Detailed photography direction for DALL-E incorporating these style preferences: ${imageStylePrompt} -- Describe setting, lighting, color grading, subject, mood. Be specific enough to produce consistent results across 7 images.",
+  "aesthetic_direction": "2-3 sentences describing the visual world of this brand.",
+  "image_style": "Detailed photography direction for DALL-E incorporating these style preferences: ${imageStylePrompt} -- Describe setting, lighting, color grading, subject, mood.",
   "hashtag_strategy": {
     "niche": ["tag1", "tag2", "tag3", "tag4", "tag5"],
     "mid": ["tag1", "tag2", "tag3", "tag4", "tag5"],
@@ -141,8 +152,8 @@ Return ONLY a valid JSON object with exactly these keys:
 Rules:
 - No em dashes anywhere in the output
 - Be hyper-specific to this brand. No generic marketing language.
-- Products must be real products found on their website, not invented ones
-- image_style must incorporate the founder's specific style preferences above`,
+- Products must be real products found on their website
+- image_style must incorporate the founder's specific style preferences`,
       }],
     });
 
@@ -152,29 +163,22 @@ Rules:
 
     const imagePreferences = { color: image_color, people: image_people, finish: image_finish };
 
-    const { data: brand, error } = await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from("brands")
-      .insert({
-        user_id: user.id,
-        brand_name, brand_description, website_url,
-        target_audience: { age_range, gender, psychographics },
-        brand_voice,
-        reference_accounts: [],
+      .update({
         brand_dna: { ...brandAnalysis, image_preferences: imagePreferences },
         content_pillars: brandAnalysis.content_pillars,
         tone_guidelines: brandAnalysis.tone_guidelines,
         hashtag_strategy: brandAnalysis.hashtag_strategy,
-        buffer_profile_id: buffer_profile_id || null,
-        onboarding_complete: true,
       })
-      .select()
-      .single();
+      .eq("id", brand_id)
+      .eq("user_id", user.id);
 
     if (error) throw new Error(error.message);
-    return NextResponse.json({ brand_id: brand.id });
+    return NextResponse.json({ success: true });
 
   } catch (err: unknown) {
-    console.error("Onboarding error:", err);
+    console.error("Regenerate DNA error:", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Something went wrong" },
       { status: 500 }

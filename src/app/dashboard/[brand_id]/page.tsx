@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 type ContentPiece = {
   day: number;
@@ -57,6 +57,7 @@ function formatScheduledTime(post_date: string, posting_time: string) {
 
 export default function DashboardPage() {
   const params = useParams();
+  const router = useRouter();
   const brand_id = params.brand_id as string;
 
   const [brand, setBrand] = useState<Brand | null>(null);
@@ -171,7 +172,7 @@ export default function DashboardPage() {
 
     if (newStatus === "approved") {
       if (!brand?.buffer_profile_id) {
-        showMessage("Approved locally. Add your Buffer Profile ID to auto-schedule.", "error");
+        showMessage("Approved locally. Add your Buffer Profile ID in settings to auto-schedule.", "error");
         setApprovingIndex(null);
         return;
       }
@@ -238,10 +239,17 @@ export default function DashboardPage() {
             {brand && <div style={{ fontSize: "12px", color: "#6B6760", marginTop: "2px" }}>{brand.brand_name}</div>}
           </div>
         </div>
-        <button onClick={generateContent} disabled={generating}
-          style={{ background: generating ? "#1E1E1C" : "#F0EDE6", color: generating ? "#4A4845" : "#0A0A0A", border: "none", borderRadius: "100px", padding: "10px 22px", fontSize: "13px", fontWeight: 500, cursor: generating ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-          {generating ? "Generating..." : "Generate This Week →"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <button
+            onClick={() => router.push(`/settings/${brand_id}`)}
+            style={{ background: "transparent", color: "#6B6760", border: "0.5px solid rgba(240,237,230,0.1)", borderRadius: "100px", padding: "8px 16px", fontSize: "12px", cursor: "pointer", fontFamily: "inherit" }}>
+            Settings
+          </button>
+          <button onClick={generateContent} disabled={generating}
+            style={{ background: generating ? "#1E1E1C" : "#F0EDE6", color: generating ? "#4A4845" : "#0A0A0A", border: "none", borderRadius: "100px", padding: "10px 22px", fontSize: "13px", fontWeight: 500, cursor: generating ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+            {generating ? "Generating..." : "Generate This Week →"}
+          </button>
+        </div>
       </nav>
 
       <div style={{ maxWidth: "860px", margin: "0 auto", padding: "32px 24px" }}>

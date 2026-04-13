@@ -18,6 +18,29 @@ const PSYCHOGRAPHIC_OPTIONS = [
   "Early adopter", "Community-oriented"
 ];
 
+const COLOR_TREATMENT_OPTIONS = [
+  { id: "full_color", label: "Full color", desc: "Vibrant and true to life" },
+  { id: "muted_film", label: "Muted / film", desc: "Soft, slightly faded, editorial" },
+  { id: "black_white", label: "Black and white", desc: "Timeless, high contrast" },
+  { id: "warm_golden", label: "Warm and golden", desc: "Rich, sun-kissed tones" },
+  { id: "dark_dramatic", label: "Dark and dramatic", desc: "Deep shadows, moody" },
+];
+
+const PEOPLE_OPTIONS = [
+  { id: "no_people", label: "No people", desc: "Product and lifestyle only" },
+  { id: "athletes", label: "Athletes", desc: "Active, performance-focused" },
+  { id: "lifestyle_people", label: "Lifestyle", desc: "Real people, everyday moments" },
+  { id: "mix", label: "Mix of both", desc: "People and product alternating" },
+];
+
+const FINISH_OPTIONS = [
+  { id: "clean_clinical", label: "Clean and clinical", desc: "Sharp, precise, scientific" },
+  { id: "bright_airy", label: "Bright and airy", desc: "Light, open, optimistic" },
+  { id: "gritty_raw", label: "Gritty and raw", desc: "Unpolished, authentic, real" },
+  { id: "luxury_refined", label: "Luxury and refined", desc: "Premium, aspirational" },
+  { id: "natural_organic", label: "Natural and organic", desc: "Earthy, wholesome, real" },
+];
+
 const LOADING_STEPS = [
   "Visiting your website...",
   "Reading your products...",
@@ -45,6 +68,9 @@ export default function OnboardingPage() {
     psychographics: [] as string[],
     brand_voice: [] as string[],
     buffer_profile_id: "",
+    image_color: "full_color",
+    image_people: "mix",
+    image_finish: "clean_clinical",
   });
 
   useEffect(() => {
@@ -120,7 +146,6 @@ export default function OnboardingPage() {
             <circle cx="24" cy="12" r="2.5" fill="#0A0A0A"/>
             <circle cx="8" cy="22" r="2" fill="#0A0A0A"/>
           </svg>
-
           <div style={{ marginBottom: "48px" }}>
             {LOADING_STEPS.map((s, i) => (
               <div key={i} style={{ fontSize: "15px", fontWeight: i === loadingStep ? 500 : 300, color: i === loadingStep ? "#F0EDE6" : i < loadingStep ? "#2A2825" : "#2A2825", marginBottom: "14px", transition: "all 0.5s ease", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px" }}>
@@ -131,7 +156,6 @@ export default function OnboardingPage() {
               </div>
             ))}
           </div>
-
           <p style={{ fontSize: "13px", color: "#4A4845", lineHeight: 1.6 }}>
             Analyzing your brand and building a custom content strategy. This takes about 30 seconds.
           </p>
@@ -146,6 +170,15 @@ export default function OnboardingPage() {
   const btnBack = { flex: 1, background: "transparent", color: "#9E9A93", border: "0.5px solid rgba(240,237,230,0.15)", borderRadius: "100px", padding: "14px", fontSize: "15px", cursor: "pointer" as const, fontFamily: "inherit" };
   const pillActive = { padding: "8px 16px", borderRadius: "100px", fontSize: "13px", border: "0.5px solid #C4A882", cursor: "pointer" as const, fontFamily: "inherit", background: "#C4A882", color: "#0A0A0A", fontWeight: 500 };
   const pillInactive = { padding: "8px 16px", borderRadius: "100px", fontSize: "13px", border: "0.5px solid rgba(240,237,230,0.15)", cursor: "pointer" as const, fontFamily: "inherit", background: "transparent", color: "#9E9A93", fontWeight: 400 };
+
+  function ImageOptionCard({ id, label, desc, selected, onClick }: { id: string, label: string, desc: string, selected: boolean, onClick: () => void }) {
+    return (
+      <button onClick={onClick} style={{ background: selected ? "rgba(196,168,130,0.1)" : "transparent", border: `0.5px solid ${selected ? "#C4A882" : "rgba(240,237,230,0.1)"}`, borderRadius: "10px", padding: "14px 16px", cursor: "pointer", fontFamily: "inherit", textAlign: "left", width: "100%", transition: "all 0.15s" }}>
+        <div style={{ fontSize: "14px", fontWeight: 500, color: selected ? "#C4A882" : "#F0EDE6", marginBottom: "3px" }}>{label}</div>
+        <div style={{ fontSize: "12px", color: "#6B6760" }}>{desc}</div>
+      </button>
+    );
+  }
 
   return (
     <main style={{ minHeight: "100vh", background: "#0A0A0A", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", fontFamily: "'DM Sans', sans-serif" }}>
@@ -164,7 +197,7 @@ export default function OnboardingPage() {
         <div style={{ background: "#111111", border: "0.5px solid rgba(240,237,230,0.08)", borderRadius: "16px", padding: "40px" }}>
 
           <div style={{ display: "flex", gap: "6px", marginBottom: "32px" }}>
-            {[1, 2, 3].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <div key={s} style={{ height: "3px", flex: 1, borderRadius: "100px", background: s <= step ? "#C4A882" : "#1E1E1C", transition: "background 0.3s" }} />
             ))}
           </div>
@@ -172,7 +205,7 @@ export default function OnboardingPage() {
           {step === 1 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
               <div>
-                <div style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "2px", textTransform: "uppercase", color: "#8B7355", marginBottom: "8px" }}>Step 1 of 3</div>
+                <div style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "2px", textTransform: "uppercase", color: "#8B7355", marginBottom: "8px" }}>Step 1 of 4</div>
                 <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "28px", color: "#F0EDE6", margin: "0 0 4px" }}>Tell us about your brand</h2>
                 <p style={{ fontSize: "14px", color: "#6B6760", margin: 0, lineHeight: 1.6 }}>We will visit your website and analyze everything so your content is truly on-brand.</p>
               </div>
@@ -201,7 +234,7 @@ export default function OnboardingPage() {
           {step === 2 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
               <div>
-                <div style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "2px", textTransform: "uppercase", color: "#8B7355", marginBottom: "8px" }}>Step 2 of 3</div>
+                <div style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "2px", textTransform: "uppercase", color: "#8B7355", marginBottom: "8px" }}>Step 2 of 4</div>
                 <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "28px", color: "#F0EDE6", margin: "0 0 4px" }}>Who buys your product?</h2>
                 <p style={{ fontSize: "14px", color: "#6B6760", margin: 0, lineHeight: 1.6 }}>Help us understand your customer so every post speaks directly to them.</p>
               </div>
@@ -238,7 +271,7 @@ export default function OnboardingPage() {
           {step === 3 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
               <div>
-                <div style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "2px", textTransform: "uppercase", color: "#8B7355", marginBottom: "8px" }}>Step 3 of 3</div>
+                <div style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "2px", textTransform: "uppercase", color: "#8B7355", marginBottom: "8px" }}>Step 3 of 4</div>
                 <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "28px", color: "#F0EDE6", margin: "0 0 4px" }}>What is your brand voice?</h2>
                 <p style={{ fontSize: "14px", color: "#6B6760", margin: 0, lineHeight: 1.6 }}>This shapes how every caption is written. Pick the tones that feel most like your brand.</p>
               </div>
@@ -256,7 +289,50 @@ export default function OnboardingPage() {
               {error && <p style={{ color: "#EF4444", fontSize: "14px", margin: 0 }}>{error}</p>}
               <div style={{ display: "flex", gap: "12px" }}>
                 <button onClick={() => setStep(2)} style={btnBack}>Back</button>
-                <button onClick={handleSubmit} disabled={loading || form.brand_voice.length === 0} style={{ ...btnPrimary(form.brand_voice.length === 0), width: "auto", flex: 1 }}>
+                <button onClick={() => setStep(4)} disabled={form.brand_voice.length === 0} style={{ ...btnPrimary(form.brand_voice.length === 0), width: "auto", flex: 1 }}>Continue</button>
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: 500, letterSpacing: "2px", textTransform: "uppercase", color: "#8B7355", marginBottom: "8px" }}>Step 4 of 4</div>
+                <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "28px", color: "#F0EDE6", margin: "0 0 4px" }}>How should your images look?</h2>
+                <p style={{ fontSize: "14px", color: "#6B6760", margin: 0, lineHeight: 1.6 }}>These preferences shape every image we generate for your brand.</p>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Color treatment</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {COLOR_TREATMENT_OPTIONS.map((o) => (
+                    <ImageOptionCard key={o.id} id={o.id} label={o.label} desc={o.desc} selected={form.image_color === o.id} onClick={() => updateField("image_color", o.id)} />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label style={labelStyle}>People in images</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {PEOPLE_OPTIONS.map((o) => (
+                    <ImageOptionCard key={o.id} id={o.id} label={o.label} desc={o.desc} selected={form.image_people === o.id} onClick={() => updateField("image_people", o.id)} />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Overall finish</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {FINISH_OPTIONS.map((o) => (
+                    <ImageOptionCard key={o.id} id={o.id} label={o.label} desc={o.desc} selected={form.image_finish === o.id} onClick={() => updateField("image_finish", o.id)} />
+                  ))}
+                </div>
+              </div>
+
+              {error && <p style={{ color: "#EF4444", fontSize: "14px", margin: 0 }}>{error}</p>}
+              <div style={{ display: "flex", gap: "12px" }}>
+                <button onClick={() => setStep(3)} style={btnBack}>Back</button>
+                <button onClick={handleSubmit} disabled={loading} style={{ ...btnPrimary(false), width: "auto", flex: 1 }}>
                   Build my brand DNA →
                 </button>
               </div>
