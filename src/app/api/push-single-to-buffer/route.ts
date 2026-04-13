@@ -4,7 +4,7 @@ export async function POST(req: NextRequest) {
   try {
     const introspection = `
       query {
-        __type(name: "PostInputMetaData") {
+        __type(name: "InstagramPostMetadataInput") {
           inputFields {
             name
             type {
