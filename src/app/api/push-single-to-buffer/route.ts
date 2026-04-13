@@ -4,40 +4,59 @@ export async function POST(req: NextRequest) {
   try {
     const { profile_id, text, scheduled_at, image_url } = await req.json();
 
-    const params = new URLSearchParams({
-      access_token: process.env.BUFFER_ACCESS_TOKEN!,
-      "profile_ids[]": profile_id,
-      text: text,
-      scheduled_at: scheduled_at.toString(),
-    });
+    const dueAt = new Date(scheduled_at * 1000).toISOString();
 
-    if (image_url) {
-      params.append("media[photo]", image_url);
-    }
-
-    const bufferRes = await fetch(
-      "https://api.bufferapp.com/1/updates/create.json",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: params,
+    const mutation = `
+      mutation CreatePost {
+        createPost(input: {
+          channelId: "${profile_id}",
+          text: ${JSON.stringify(text)},
+          schedulingType: automatic,
+          mode: customScheduled,
+          dueAt: "${dueAt}"
+        }) {
+          ... on PostActionSuccess {
+            post {
+              id
+              dueAt
+            }
+          }
+          ... on MutationError {
+            message
+          }
+        }
       }
-    );
+    `;
+
+    const bufferRes = await fetch("https://api.buffer.com", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.BUFFER_ACCESS_TOKEN}`,
+      },
+      body: JSON.stringify({ query: mutation }),
+    });
 
     const bufferData = await bufferRes.json();
 
-    // Return full Buffer response so we can see exactly what's failing
+    if (bufferData.errors) {
+      return NextResponse.json(
+        { error: bufferData.errors[0].message },
+        { status: 400 }
+      );
+    }
+
+    const result = bufferData.data?.createPost;
+
+    if (result?.message) {
+      // MutationError
+      return NextResponse.json({ error: result.message }, { status: 400 });
+    }
+
     return NextResponse.json({
-      success: bufferRes.ok,
-      status: bufferRes.status,
-      buffer_response: bufferData,
-      debug: {
-        profile_id_used: profile_id,
-        scheduled_at_used: scheduled_at,
-        text_length: text?.length,
-        has_image: !!image_url,
-        has_token: !!process.env.BUFFER_ACCESS_TOKEN,
-      }
+      success: true,
+      buffer_id: result?.post?.id,
+      scheduled_at: result?.post?.dueAt,
     });
 
   } catch (err: unknown) {
