@@ -26,14 +26,20 @@ export async function POST(req: NextRequest) {
 
     const bufferData = await bufferRes.json();
 
-    if (!bufferRes.ok) {
-      throw new Error(bufferData.message || "Buffer API error");
-    }
-
+    // Return full Buffer response so we can see exactly what's failing
     return NextResponse.json({
-      success: true,
-      buffer_id: bufferData.id,
+      success: bufferRes.ok,
+      status: bufferRes.status,
+      buffer_response: bufferData,
+      debug: {
+        profile_id_used: profile_id,
+        scheduled_at_used: scheduled_at,
+        text_length: text?.length,
+        has_image: !!image_url,
+        has_token: !!process.env.BUFFER_ACCESS_TOKEN,
+      }
     });
+
   } catch (err: unknown) {
     console.error("Buffer push error:", err);
     return NextResponse.json(
