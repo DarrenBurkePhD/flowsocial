@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
-);
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,21 +8,44 @@ export async function GET(req: NextRequest) {
     const brand_id = searchParams.get("brand_id");
 
     if (!brand_id) {
-      return NextResponse.json(
-        { error: "brand_id required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "brand_id required" }, { status: 400 });
+    }
+
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {}
+          },
+        },
+      }
+    );
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const { data: brand, error } = await supabase
       .from("brands")
       .select("id, brand_name, brand_description, buffer_profile_id")
       .eq("id", brand_id)
+      .eq("user_id", user.id)
       .single();
 
     if (error) throw new Error(error.message);
-
     return NextResponse.json({ brand });
+
   } catch (err: unknown) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Something went wrong" },

@@ -1,16 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const supabase = createClient(
+const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!
 );
 
 export async function POST(req: NextRequest) {
   try {
+    // Get the authenticated user from the session
+    const cookieStore = await cookies();
+    const supabaseAuth = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {}
+          },
+        },
+      }
+    );
+
+    const { data: { user } } = await supabaseAuth.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
     const body = await req.json();
     const {
       brand_name,
@@ -31,14 +59,12 @@ export async function POST(req: NextRequest) {
         {
           role: "user",
           content: `You are a premium Food & Beverage brand strategist specializing in sports nutrition and wellness brands. Analyze this brand and produce a structured brand DNA document that will guide Instagram content creation.
-
 Brand name: ${brand_name}
 Description: ${brand_description}
 Website: ${website_url}
 Target audience: ${age_range}, ${gender}, interests: ${psychographics.join(", ")}
 Brand voice: ${brand_voice.join(", ")}
 Reference Instagram accounts: ${reference_accounts.filter(Boolean).join(", ")}
-
 Return ONLY a valid JSON object with exactly these keys:
 {
   "brand_dna": "2-3 sentence brand essence statement",
@@ -52,7 +78,6 @@ Return ONLY a valid JSON object with exactly these keys:
   },
   "cta_library": ["cta 1", "cta 2", "cta 3", "cta 4", "cta 5"]
 }
-
 Rules: No em dashes in any text. Be specific to this brand. No generic marketing language.`,
         },
       ],
@@ -65,9 +90,10 @@ Rules: No em dashes in any text. Be specific to this brand. No generic marketing
       .trim();
     const brandAnalysis = JSON.parse(cleanedResponse);
 
-    const { data: brand, error } = await supabase
+    const { data: brand, error } = await supabaseAdmin
       .from("brands")
       .insert({
+        user_id: user.id,
         brand_name,
         brand_description,
         website_url,
@@ -85,8 +111,8 @@ Rules: No em dashes in any text. Be specific to this brand. No generic marketing
       .single();
 
     if (error) throw new Error(error.message);
-
     return NextResponse.json({ brand_id: brand.id });
+
   } catch (err: unknown) {
     console.error("Onboarding error:", err);
     return NextResponse.json(

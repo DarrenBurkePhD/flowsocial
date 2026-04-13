@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 const BRAND_VOICE_OPTIONS = [
   "Warm & nurturing", "Cool & minimal", "Playful & witty",
@@ -21,6 +22,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
 
   const [form, setForm] = useState({
@@ -34,6 +36,17 @@ export default function OnboardingPage() {
     reference_accounts: ["", "", ""],
     buffer_profile_id: "",
   });
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.push("/auth");
+      } else {
+        setChecking(false);
+      }
+    });
+  }, [router]);
 
   function updateField(field: string, value: unknown) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -71,6 +84,14 @@ export default function OnboardingPage() {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);
     }
+  }
+
+  if (checking) {
+    return (
+      <main style={{ minHeight: "100vh", background: "#0A0A0A", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: "#6B6760", fontSize: "14px" }}>Loading...</div>
+      </main>
+    );
   }
 
   return (
@@ -178,7 +199,7 @@ export default function OnboardingPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Your customer's identity (pick up to 5)
+                Your customer identity (pick up to 5)
               </label>
               <div className="flex flex-wrap gap-2">
                 {PSYCHOGRAPHIC_OPTIONS.map((o) => (
