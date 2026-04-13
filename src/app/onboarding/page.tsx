@@ -88,97 +88,114 @@ export default function OnboardingPage() {
 
   if (checking) {
     return (
-      <main style={{ minHeight: "100vh", background: "#0A0A0A", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: "#6B6760", fontSize: "14px" }}>Loading...</div>
+      <main style={{ minHeight: "100vh", background: "#F9FAFB", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: "#6B7280", fontSize: "14px" }}>Loading...</div>
       </main>
     );
   }
 
-  return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 max-w-xl w-full p-8">
+  const inputStyle = { width: "100%", border: "1px solid #E5E7EB", borderRadius: "8px", padding: "12px 16px", fontSize: "15px", color: "#111827", outline: "none", boxSizing: "border-box" as const, fontFamily: "inherit" };
+  const labelStyle = { display: "block", fontSize: "14px", fontWeight: 500, color: "#374151", marginBottom: "6px" };
+  const btnPrimary = { width: "100%", background: "#000", color: "#fff", border: "none", borderRadius: "100px", padding: "14px", fontSize: "15px", fontWeight: 500, cursor: "pointer", transition: "opacity 0.2s", fontFamily: "inherit" };
+  const btnSecondary = { flex: 1, background: "#fff", color: "#4B5563", border: "1px solid #E5E7EB", borderRadius: "100px", padding: "14px", fontSize: "15px", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" };
 
-        <div className="flex gap-2 mb-8">
+  return (
+    <main style={{ minHeight: "100vh", background: "#F9FAFB", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", fontFamily: "'DM Sans', sans-serif" }}>
+      <div style={{ background: "#fff", borderRadius: "16px", border: "1px solid #F3F4F6", maxWidth: "560px", width: "100%", padding: "40px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+
+        {/* Progress */}
+        <div style={{ display: "flex", gap: "8px", marginBottom: "32px" }}>
           {[1, 2, 3].map((s) => (
-            <div key={s} className={`h-1 flex-1 rounded-full ${s <= step ? "bg-black" : "bg-gray-200"}`} />
+            <div key={s} style={{ height: "4px", flex: 1, borderRadius: "100px", background: s <= step ? "#000" : "#E5E7EB" }} />
           ))}
         </div>
 
+        {/* Step 1 */}
         {step === 1 && (
-          <div className="space-y-5">
-            <h2 className="text-2xl font-bold text-gray-900">Your brand</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <h2 style={{ fontSize: "24px", fontWeight: 700, color: "#111827", margin: 0 }}>Your brand</h2>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Brand name</label>
-              <input type="text" value={form.brand_name} onChange={(e) => updateField("brand_name", e.target.value)} placeholder="e.g. Headstrong" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black" />
+              <label style={labelStyle}>Brand name</label>
+              <input type="text" value={form.brand_name} onChange={(e) => updateField("brand_name", e.target.value)} placeholder="e.g. Headstrong" style={inputStyle} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">One sentence: what does your brand do?</label>
-              <textarea value={form.brand_description} onChange={(e) => updateField("brand_description", e.target.value)} placeholder="e.g. We make brain-first supplements for contact sport athletes." rows={3} className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black resize-none" />
+              <label style={labelStyle}>One sentence: what does your brand do?</label>
+              <textarea value={form.brand_description} onChange={(e) => updateField("brand_description", e.target.value)} placeholder="e.g. We make brain-first supplements for contact sport athletes." rows={3} style={{ ...inputStyle, resize: "none" }} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
-              <input type="url" value={form.website_url} onChange={(e) => updateField("website_url", e.target.value)} placeholder="https://yourbrand.com" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black" />
+              <label style={labelStyle}>Website URL</label>
+              <input type="url" value={form.website_url} onChange={(e) => updateField("website_url", e.target.value)} placeholder="https://yourbrand.com" style={inputStyle} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Buffer Profile ID</label>
-              <input type="text" value={form.buffer_profile_id} onChange={(e) => updateField("buffer_profile_id", e.target.value)} placeholder="e.g. 68a9f9053d2fbc20d49ad446" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black" />
-              <p className="text-xs text-gray-400 mt-1">Find this in your Buffer URL: buffer.com/channels/YOUR-ID/schedule</p>
+              <label style={labelStyle}>Buffer Profile ID</label>
+              <input type="text" value={form.buffer_profile_id} onChange={(e) => updateField("buffer_profile_id", e.target.value)} placeholder="e.g. 68a9f9053d2fbc20d49ad446" style={inputStyle} />
+              <p style={{ fontSize: "12px", color: "#9CA3AF", marginTop: "4px" }}>Find this in your Buffer URL: buffer.com/channels/YOUR-ID/schedule</p>
             </div>
-            <button onClick={() => setStep(2)} disabled={!form.brand_name || !form.brand_description} className="w-full bg-black text-white py-3 rounded-full font-medium hover:bg-gray-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">Continue</button>
+            <button onClick={() => setStep(2)} disabled={!form.brand_name || !form.brand_description} style={{ ...btnPrimary, opacity: !form.brand_name || !form.brand_description ? 0.3 : 1 }}>Continue</button>
           </div>
         )}
 
+        {/* Step 2 */}
         {step === 2 && (
-          <div className="space-y-5">
-            <h2 className="text-2xl font-bold text-gray-900">Your audience</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <h2 style={{ fontSize: "24px", fontWeight: 700, color: "#111827", margin: 0 }}>Your audience</h2>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Age range</label>
-              <select value={form.age_range} onChange={(e) => updateField("age_range", e.target.value)} className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black">
+              <label style={labelStyle}>Age range</label>
+              <select value={form.age_range} onChange={(e) => updateField("age_range", e.target.value)} style={inputStyle}>
                 {["18-24", "25-34", "35-44", "45+", "Mixed"].map((o) => <option key={o}>{o}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-              <select value={form.gender} onChange={(e) => updateField("gender", e.target.value)} className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black">
+              <label style={labelStyle}>Gender</label>
+              <select value={form.gender} onChange={(e) => updateField("gender", e.target.value)} style={inputStyle}>
                 {["Women", "Men", "Non-binary", "All genders"].map((o) => <option key={o}>{o}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Your customer identity (pick up to 5)</label>
-              <div className="flex flex-wrap gap-2">
+              <label style={labelStyle}>Your customer identity (pick up to 5)</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                 {PSYCHOGRAPHIC_OPTIONS.map((o) => (
-                  <button key={o} onClick={() => toggleArrayItem("psychographics", o)} disabled={!form.psychographics.includes(o) && form.psychographics.length >= 5} className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${form.psychographics.includes(o) ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"} disabled:opacity-30`}>{o}</button>
+                  <button key={o} onClick={() => toggleArrayItem("psychographics", o)} disabled={!form.psychographics.includes(o) && form.psychographics.length >= 5}
+                    style={{ padding: "6px 14px", borderRadius: "100px", fontSize: "13px", border: "1px solid", cursor: "pointer", fontFamily: "inherit", background: form.psychographics.includes(o) ? "#000" : "#fff", color: form.psychographics.includes(o) ? "#fff" : "#4B5563", borderColor: form.psychographics.includes(o) ? "#000" : "#E5E7EB", opacity: !form.psychographics.includes(o) && form.psychographics.length >= 5 ? 0.3 : 1 }}>
+                    {o}
+                  </button>
                 ))}
               </div>
             </div>
-            <div className="flex gap-3">
-              <button onClick={() => setStep(1)} className="flex-1 border border-gray-200 text-gray-600 py-3 rounded-full font-medium hover:bg-gray-50 transition-colors">Back</button>
-              <button onClick={() => setStep(3)} disabled={form.psychographics.length === 0} className="flex-1 bg-black text-white py-3 rounded-full font-medium hover:bg-gray-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">Continue</button>
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button onClick={() => setStep(1)} style={btnSecondary}>Back</button>
+              <button onClick={() => setStep(3)} disabled={form.psychographics.length === 0} style={{ ...btnPrimary, flex: 1, width: "auto", opacity: form.psychographics.length === 0 ? 0.3 : 1 }}>Continue</button>
             </div>
           </div>
         )}
 
+        {/* Step 3 */}
         {step === 3 && (
-          <div className="space-y-5">
-            <h2 className="text-2xl font-bold text-gray-900">Your voice</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <h2 style={{ fontSize: "24px", fontWeight: 700, color: "#111827", margin: 0 }}>Your voice</h2>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Brand voice (pick up to 3)</label>
-              <div className="flex flex-wrap gap-2">
+              <label style={labelStyle}>Brand voice (pick up to 3)</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                 {BRAND_VOICE_OPTIONS.map((o) => (
-                  <button key={o} onClick={() => toggleArrayItem("brand_voice", o)} disabled={!form.brand_voice.includes(o) && form.brand_voice.length >= 3} className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${form.brand_voice.includes(o) ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"} disabled:opacity-30`}>{o}</button>
+                  <button key={o} onClick={() => toggleArrayItem("brand_voice", o)} disabled={!form.brand_voice.includes(o) && form.brand_voice.length >= 3}
+                    style={{ padding: "6px 14px", borderRadius: "100px", fontSize: "13px", border: "1px solid", cursor: "pointer", fontFamily: "inherit", background: form.brand_voice.includes(o) ? "#000" : "#fff", color: form.brand_voice.includes(o) ? "#fff" : "#4B5563", borderColor: form.brand_voice.includes(o) ? "#000" : "#E5E7EB", opacity: !form.brand_voice.includes(o) && form.brand_voice.length >= 3 ? 0.3 : 1 }}>
+                    {o}
+                  </button>
                 ))}
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">3 Instagram accounts whose aesthetic you want to match</label>
+              <label style={labelStyle}>3 Instagram accounts whose aesthetic you want to match</label>
               {form.reference_accounts.map((account, i) => (
-                <input key={i} type="text" value={account} onChange={(e) => updateReferenceAccount(i, e.target.value)} placeholder="@handle" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black mb-2" />
+                <input key={i} type="text" value={account} onChange={(e) => updateReferenceAccount(i, e.target.value)} placeholder="@handle" style={{ ...inputStyle, marginBottom: "8px" }} />
               ))}
             </div>
-            {error && <p className="text-red-500 text-sm">{error}</p>}
-            <div className="flex gap-3">
-              <button onClick={() => setStep(2)} className="flex-1 border border-gray-200 text-gray-600 py-3 rounded-full font-medium hover:bg-gray-50 transition-colors">Back</button>
-              <button onClick={handleSubmit} disabled={loading || form.brand_voice.length === 0} className="flex-1 bg-black text-white py-3 rounded-full font-medium hover:bg-gray-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">{loading ? "Analyzing your brand..." : "Generate my content →"}</button>
+            {error && <p style={{ color: "#EF4444", fontSize: "14px", margin: 0 }}>{error}</p>}
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button onClick={() => setStep(2)} style={btnSecondary}>Back</button>
+              <button onClick={handleSubmit} disabled={loading || form.brand_voice.length === 0} style={{ ...btnPrimary, flex: 1, width: "auto", opacity: loading || form.brand_voice.length === 0 ? 0.3 : 1 }}>
+                {loading ? "Analyzing your brand..." : "Generate my content →"}
+              </button>
             </div>
           </div>
         )}
