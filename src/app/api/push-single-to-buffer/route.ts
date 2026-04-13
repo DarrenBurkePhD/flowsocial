@@ -22,15 +22,11 @@ export async function POST(req: NextRequest) {
           schedulingType: automatic,
           mode: customScheduled,
           dueAt: "${dueAt}",
+          type: ${instagramType},
           assets: {
             images: [
               { url: ${JSON.stringify(image_url)} }
             ]
-          },
-          serviceData: {
-            instagram: {
-              type: ${instagramType}
-            }
           }
         }) {
           ... on PostActionSuccess {
