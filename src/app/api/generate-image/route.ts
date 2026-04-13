@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       ? `Photography style: ${image_style}`
       : "Premium lifestyle photography. Clean, editorial, high-end consumer brand aesthetic. Natural lighting. Real people or products, not illustrated.";
 
-    const fullPrompt = `${image_prompt}. ${styleGuide}. No text overlays, no words, no labels, no logos in the image. Photorealistic, not illustrated or artistic. Shot on high-end camera. Instagram-ready.`;
+    const fullPrompt = `${image_prompt}. ${styleGuide}. No text overlays, no words, no labels, no logos in the image. No supplement bottles, no product packaging, no branded containers, no generic product shots. Photorealistic lifestyle photography only. Shot on high-end camera. Instagram-ready.`;
 
     const response = await openai.images.generate({
       model: "dall-e-3",
