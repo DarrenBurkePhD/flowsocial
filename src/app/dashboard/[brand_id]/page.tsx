@@ -65,6 +65,7 @@ export default function DashboardPage() {
   const [generating, setGenerating] = useState(false);
   const [generatingImages, setGeneratingImages] = useState<number[]>([]);
   const [approvingIndex, setApprovingIndex] = useState<number | null>(null);
+  const [hoveredImage, setHoveredImage] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [selectedPiece, setSelectedPiece] = useState<number | null>(null);
@@ -226,6 +227,12 @@ export default function DashboardPage() {
   return (
     <main style={{ minHeight: "100vh", background: "#0A0A0A", color: "#F0EDE6", fontFamily: "'DM Sans', sans-serif" }}>
 
+      <style>{`
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+        .regen-btn { opacity: 0; transition: opacity 0.2s; }
+        .img-wrap:hover .regen-btn { opacity: 1; }
+      `}</style>
+
       <nav style={{ background: "#0A0A0A", borderBottom: "0.5px solid rgba(240,237,230,0.08)", padding: "20px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
@@ -274,7 +281,6 @@ export default function DashboardPage() {
 
         {generating && (
           <div style={{ textAlign: "center", padding: "80px 24px" }}>
-            <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }`}</style>
             <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "48px", color: "#C4A882", marginBottom: "24px", animation: "pulse 2s ease-in-out infinite" }}>✦</div>
             <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "24px", color: "#F0EDE6", margin: "0 0 8px" }}>Crafting your content strategy...</h2>
             <p style={{ fontSize: "14px", color: "#6B6760" }}>Flow Social is writing 7 days of on-brand content. About 20 seconds.</p>
@@ -305,20 +311,40 @@ export default function DashboardPage() {
                       <div style={{ fontSize: "10px", color: "#3A3835", marginTop: "2px" }}>{piece.posting_time}</div>
                     </div>
 
-                    <div style={{ width: "76px", height: "76px", borderRadius: "8px", background: "#1A1A18", flexShrink: 0, overflow: "hidden" }}>
-                      {piece.image_url ? (
-                        <img src={piece.image_url} alt={piece.concept} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    {/* Image with hover regenerate */}
+                    <div
+                      className="img-wrap"
+                      style={{ width: "76px", height: "76px", borderRadius: "8px", background: "#1A1A18", flexShrink: 0, overflow: "hidden", position: "relative" }}
+                      onMouseEnter={() => setHoveredImage(index)}
+                      onMouseLeave={() => setHoveredImage(null)}
+                    >
+                      {generatingImages.includes(index) ? (
+                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <span style={{ fontSize: "10px", color: "#6B6760" }}>...</span>
+                        </div>
+                      ) : piece.image_url ? (
+                        <>
+                          <img src={piece.image_url} alt={piece.concept} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          {/* Hover overlay with regenerate button */}
+                          <div
+                            className="regen-btn"
+                            style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                            onClick={() => generateImage(index)}
+                            title="Generate new image"
+                          >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F0EDE6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                              <path d="M21 3v5h-5"/>
+                              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                              <path d="M8 16H3v5"/>
+                            </svg>
+                          </div>
+                        </>
                       ) : (
-                        <button onClick={() => generateImage(index)} disabled={generatingImages.includes(index)}
-                          style={{ width: "100%", height: "100%", background: "none", border: "none", cursor: generatingImages.includes(index) ? "default" : "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", color: "#3A3835" }}>
-                          {generatingImages.includes(index) ? (
-                            <span style={{ fontSize: "10px", color: "#6B6760" }}>...</span>
-                          ) : (
-                            <>
-                              <span style={{ fontSize: "18px" }}>+</span>
-                              <span style={{ fontSize: "9px", letterSpacing: "0.5px" }}>IMAGE</span>
-                            </>
-                          )}
+                        <button onClick={() => generateImage(index)}
+                          style={{ width: "100%", height: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", color: "#3A3835" }}>
+                          <span style={{ fontSize: "18px" }}>+</span>
+                          <span style={{ fontSize: "9px", letterSpacing: "0.5px" }}>IMAGE</span>
                         </button>
                       )}
                     </div>
