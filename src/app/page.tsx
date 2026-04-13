@@ -95,8 +95,8 @@ export default function Home() {
         <div className="fs-steps">
           {[
             { num: "01", title: "Tell us your brand", desc: "Share your brand name, voice, audience, and a few reference accounts. Takes 3 minutes.", cls: "fs-step-first" },
-            { num: "02", title: "Generate your week", desc: "One click. Flow Social writes 7 days of on-brand posts ready for your review and approval.", cls: "" },
-            { num: "03", title: "Approve and schedule", desc: "Review each post, generate images, hit approve. Flow Social schedules everything automatically.", cls: "fs-step-last" },
+            { num: "02", title: "Generate your week", desc: "One click. Flow Social creates 7 days of on-brand posts ready for your review.", cls: "" },
+            { num: "03", title: "Approve and schedule", desc: "Review each post, generate images, hit approve. Your posts gets scheduled.", cls: "fs-step-last" },
           ].map((step, i) => (
             <div
               key={i}
@@ -130,10 +130,10 @@ export default function Home() {
         >
           <div>
             <div className="fs-proof-quote">
-              "We went from posting twice a month to every single day and the content actually sounds like us."
+              "We went from posting twice a month to every day, and with curated, on brand, engaging content."
             </div>
             <div style={{ fontSize: "12px", fontWeight: 500, letterSpacing: "1.5px", textTransform: "uppercase", color: "#8B7355", marginTop: "20px" }}>
-              Headstrong — Brain first sports nutrition for athletes in contact sport
+              Headstrong — Brain first sports nutrition for athletes
             </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
@@ -175,7 +175,7 @@ export default function Home() {
             {[
               "7 posts for each week",
               "AI powered image per post",
-              "Auto-scheduling to Instagram via Buffer",
+              "Auto-scheduling to IG via Buffer",
               "Your brands DNA every post",
               "Caption editing and regeneration",
               "Unlimited content packages",
