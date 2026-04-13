@@ -13,16 +13,13 @@ const supabaseAdmin = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    // Get the authenticated user from the session
     const cookieStore = await cookies();
     const supabaseAuth = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
+          getAll() { return cookieStore.getAll(); },
           setAll(cookiesToSet) {
             try {
               cookiesToSet.forEach(({ name, value, options }) =>
@@ -41,24 +38,17 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const {
-      brand_name,
-      brand_description,
-      website_url,
-      age_range,
-      gender,
-      psychographics,
-      brand_voice,
-      reference_accounts,
-      buffer_profile_id,
+      brand_name, brand_description, website_url,
+      age_range, gender, psychographics,
+      brand_voice, reference_accounts, buffer_profile_id,
     } = body;
 
     const message = await anthropic.messages.create({
       model: "claude-opus-4-5",
       max_tokens: 2000,
-      messages: [
-        {
-          role: "user",
-          content: `You are a premium Food & Beverage brand strategist specializing in sports nutrition and wellness brands. Analyze this brand and produce a structured brand DNA document that will guide Instagram content creation.
+      messages: [{
+        role: "user",
+        content: `You are a premium Food & Beverage brand strategist specializing in sports nutrition and wellness brands. Analyze this brand and produce a structured brand DNA document that will guide Instagram content creation.
 Brand name: ${brand_name}
 Description: ${brand_description}
 Website: ${website_url}
@@ -79,24 +69,18 @@ Return ONLY a valid JSON object with exactly these keys:
   "cta_library": ["cta 1", "cta 2", "cta 3", "cta 4", "cta 5"]
 }
 Rules: No em dashes in any text. Be specific to this brand. No generic marketing language.`,
-        },
-      ],
+      }],
     });
 
-    const responseText =
-      message.content[0].type === "text" ? message.content[0].text : "";
-    const cleanedResponse = responseText
-      .replace(/```json\n?|\n?```/g, "")
-      .trim();
+    const responseText = message.content[0].type === "text" ? message.content[0].text : "";
+    const cleanedResponse = responseText.replace(/```json\n?|\n?```/g, "").trim();
     const brandAnalysis = JSON.parse(cleanedResponse);
 
     const { data: brand, error } = await supabaseAdmin
       .from("brands")
       .insert({
         user_id: user.id,
-        brand_name,
-        brand_description,
-        website_url,
+        brand_name, brand_description, website_url,
         target_audience: { age_range, gender, psychographics },
         brand_voice,
         reference_accounts: reference_accounts.filter(Boolean),
