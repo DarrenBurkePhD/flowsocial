@@ -11,7 +11,7 @@ const supabaseAdmin = createClient(
 export async function POST(req: NextRequest) {
   try {
     const cookieStore = await cookies();
-    const supabaseAuth = createServerClient(
+    const supabaseAuth = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
