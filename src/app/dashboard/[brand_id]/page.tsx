@@ -56,36 +56,61 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-async function fetchPexelsImages(brandDna: Brand["brand_dna"], count: number): Promise<{ url: string; source: "unsplash" }[]> {
+async function fetchPexelsForConcept(concept: string, contentPillar: string, brandDna: Brand["brand_dna"]): Promise<string | null> {
+  // Build a contextual query from the post concept + pillar + brand aesthetic
   const parts: string[] = [];
-  if (brandDna?.aesthetic_direction) parts.push(brandDna.aesthetic_direction.split(" ").slice(0, 3).join(" "));
-  if (brandDna?.content_pillars?.length) parts.push(brandDna.content_pillars[0]);
-  if (brandDna?.products?.length) parts.push(brandDna.products[0].split(" ").slice(0, 2).join(" "));
-  const query = parts.join(" ").trim() || "lifestyle product photography";
+  parts.push(concept.split(" ").slice(0, 5).join(" "));
+  if (brandDna?.aesthetic_direction) parts.push(brandDna.aesthetic_direction.split(" ").slice(0, 2).join(" "));
+  const query = parts.join(" ").trim();
+
   try {
-    const res = await fetch(`/api/unsplash-search?query=${encodeURIComponent(query)}&count=${Math.max(count * 2, 10)}`);
-    if (!res.ok) return [];
+    const res = await fetch(`/api/unsplash-search?query=${encodeURIComponent(query)}&count=5`);
+    if (!res.ok) return null;
     const data = await res.json();
-    return (data.photos || []).map((p: { url: string }) => ({ url: p.url, source: "unsplash" as const }));
+    if (!data.photos?.length) {
+      // Fallback: try just the content pillar
+      const fallback = await fetch(`/api/unsplash-search?query=${encodeURIComponent(contentPillar)}&count=5`);
+      if (!fallback.ok) return null;
+      const fallbackData = await fallback.json();
+      if (!fallbackData.photos?.length) return null;
+      return fallbackData.photos[Math.floor(Math.random() * fallbackData.photos.length)].url;
+    }
+    return data.photos[Math.floor(Math.random() * data.photos.length)].url;
   } catch {
-    return [];
+    return null;
   }
 }
 
 async function assignImages(pieces: ContentPiece[], brandAssets: BrandAsset[], brandDna: Brand["brand_dna"]): Promise<ContentPiece[]> {
-  const count = pieces.length;
   const hasBrandAssets = brandAssets.length > 0;
-  const brandCount = hasBrandAssets ? Math.round(count * 0.6) : 0;
-  const unsplashCount = count - brandCount;
-  const unsplashPool = await fetchPexelsImages(brandDna, unsplashCount);
-  const brandPool = shuffle([...brandAssets]).slice(0, brandCount).map((a) => ({ url: a.public_url, source: "brand" as const }));
-  const unsplashSlots = shuffle([...unsplashPool]).slice(0, unsplashCount);
-  const allSlots: { url: string; source: "brand" | "unsplash" }[] = shuffle([...brandPool, ...unsplashSlots]);
-  return pieces.map((piece, i) => ({
-    ...piece,
-    image_url: allSlots[i]?.url || piece.image_url || undefined,
-    image_source: allSlots[i]?.source || piece.image_source || null,
-  }));
+  const shuffledAssets = shuffle([...brandAssets]);
+  let assetIndex = 0;
+
+  const result: ContentPiece[] = [];
+
+  for (let i = 0; i < pieces.length; i++) {
+    const piece = pieces[i];
+    // 60% brand assets if available, otherwise always stock
+    const useBrand = hasBrandAssets && Math.random() < 0.6 && assetIndex < shuffledAssets.length;
+
+    if (useBrand) {
+      result.push({
+        ...piece,
+        image_url: shuffledAssets[assetIndex].public_url,
+        image_source: "brand",
+      });
+      assetIndex++;
+    } else {
+      const url = await fetchPexelsForConcept(piece.concept, piece.content_pillar, brandDna);
+      result.push({
+        ...piece,
+        image_url: url || piece.image_url || undefined,
+        image_source: url ? "unsplash" : (piece.image_source || null),
+      });
+    }
+  }
+
+  return result;
 }
 
 function getWeekDates(startDate: string) {
@@ -135,17 +160,17 @@ function isThisWeeksPackage(weekStartDate: string): boolean {
   return diffDays < 7;
 }
 
-function ImageSourceBadge({ source }: { source?: "brand" | "unsplash" | "ai" | null }) {
+function ImageSourceLabel({ source }: { source?: "brand" | "unsplash" | "ai" | null }) {
   if (!source) return null;
   const config = {
-    brand: { label: "Yours", color: "#C4A882", bg: "rgba(196,168,130,0.15)" },
-    unsplash: { label: "Stock", color: "#9E9A93", bg: "rgba(158,154,147,0.12)" },
-    ai: { label: "AI", color: "#6B6760", bg: "rgba(107,103,96,0.15)" },
+    brand: { label: "Your photo", color: "#C4A882" },
+    unsplash: { label: "Stock", color: "#4A4845" },
+    ai: { label: "AI generated", color: "#4A4845" },
   };
   const c = config[source];
   if (!c) return null;
   return (
-    <div style={{ position: "absolute", bottom: "4px", left: "4px", background: c.bg, borderRadius: "4px", padding: "1px 5px", fontSize: "8px", color: c.color, letterSpacing: "0.3px", fontWeight: 500 }}>
+    <div style={{ fontSize: "9px", color: c.color, marginTop: "3px", textAlign: "center", letterSpacing: "0.2px" }}>
       {c.label}
     </div>
   );
@@ -386,7 +411,8 @@ ${cleanHashtags}`;
         .day-num { font-family: 'DM Serif Display', serif; font-size: 22px; line-height: 1; }
         .day-month { font-size: 9px; color: #4A4845; text-transform: uppercase; }
         .day-time { font-size: 9px; color: #3A3835; margin-top: 2px; }
-        .img-thumb { width: 64px; height: 64px; border-radius: 8px; background: #1A1A18; flex-shrink: 0; overflow: hidden; position: relative; }
+        .img-col { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+        .img-thumb { width: 64px; height: 64px; border-radius: 8px; background: #1A1A18; overflow: hidden; position: relative; }
         .content-col { flex: 1; min-width: 0; }
         .content-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; }
         .content-tag { font-size: 9px; color: #6B6760; background: rgba(240,237,230,0.05); padding: 2px 7px; border-radius: 100px; border: 0.5px solid rgba(240,237,230,0.08); text-transform: capitalize; white-space: nowrap; }
@@ -401,7 +427,8 @@ ${cleanHashtags}`;
           .post-row { flex-direction: column; gap: 0; }
           .mobile-top-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
           .day-col { text-align: left; min-width: unset; display: flex; align-items: baseline; gap: 5px; }
-          .img-thumb { width: 100%; height: 180px; border-radius: 10px; margin-bottom: 12px; }
+          .img-col { width: 100%; }
+          .img-thumb { width: 100%; height: 180px; border-radius: 10px; }
           .action-col { width: 100%; margin-top: 12px; }
           .btn-scheduled, .btn-add-image, .btn-approve { padding: 12px; font-size: 13px; border-radius: 10px; }
         }
@@ -526,30 +553,33 @@ ${cleanHashtags}`;
                         <div className="day-month">{weekDates[(piece.day - 1) % 7]?.month ?? ""}</div>
                         <div className="day-time">{piece.posting_time}</div>
                       </div>
-                      <div className="img-thumb img-wrap">
-                        {generatingImages.includes(index) ? (
-                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <span style={{ fontSize: "10px", color: "#6B6760" }}>...</span>
-                          </div>
-                        ) : piece.image_url ? (
-                          <>
-                            <img src={piece.image_url} alt={piece.concept} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            <ImageSourceBadge source={piece.image_source} />
-                            <div className="regen-btn" style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} onClick={() => generateImage(index)}>
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F0EDE6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-                                <path d="M21 3v5h-5"/>
-                                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-                                <path d="M8 16H3v5"/>
-                              </svg>
+
+                      <div className="img-col">
+                        <div className="img-thumb img-wrap">
+                          {generatingImages.includes(index) ? (
+                            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <span style={{ fontSize: "10px", color: "#6B6760" }}>...</span>
                             </div>
-                          </>
-                        ) : (
-                          <button onClick={() => generateImage(index)} style={{ width: "100%", height: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", color: "#3A3835" }}>
-                            <span style={{ fontSize: "16px" }}>+</span>
-                            <span style={{ fontSize: "8px", letterSpacing: "0.5px" }}>IMAGE</span>
-                          </button>
-                        )}
+                          ) : piece.image_url ? (
+                            <>
+                              <img src={piece.image_url} alt={piece.concept} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              <div className="regen-btn" style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} onClick={() => generateImage(index)}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F0EDE6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                                  <path d="M21 3v5h-5"/>
+                                  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                                  <path d="M8 16H3v5"/>
+                                </svg>
+                              </div>
+                            </>
+                          ) : (
+                            <button onClick={() => generateImage(index)} style={{ width: "100%", height: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", color: "#3A3835" }}>
+                              <span style={{ fontSize: "16px" }}>+</span>
+                              <span style={{ fontSize: "8px", letterSpacing: "0.5px" }}>IMAGE</span>
+                            </button>
+                          )}
+                        </div>
+                        <ImageSourceLabel source={piece.image_source} />
                       </div>
                     </div>
 
@@ -604,9 +634,7 @@ ${cleanHashtags}`;
 
             {weekLocked && (
               <div style={{ textAlign: "center", paddingTop: "24px", paddingBottom: "8px" }}>
-                <button
-                  onClick={generateContent}
-                  disabled={generating}
+                <button onClick={generateContent} disabled={generating}
                   style={{ background: "none", border: "none", color: "#3A3835", fontSize: "12px", cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>
                   Start fresh with a new week
                 </button>
