@@ -1,59 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
 
-const supabaseAdmin = createClient(
+const supabaseAdmin = createSupabaseAdmin(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!
 );
 
 export async function POST(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabaseAuth = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return cookieStore.getAll(); },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {}
-          },
-        },
-      }
-    );
+    const supabase = await createClient();
 
-    const { data: { user } } = await supabaseAuth.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const body = await req.json();
     const {
-      brand_id,
-      brand_name,
-      brand_description,
-      website_url,
-      buffer_profile_id,
-      brand_voice,
-      age_range,
-      gender,
-      psychographics,
-      image_color,
-      image_people,
-      image_finish,
-      logo_url,
+      brand_id, brand_name, brand_description, website_url,
+      buffer_profile_id, brand_voice, age_range, gender,
+      psychographics, image_color, image_people, image_finish, logo_url,
     } = body;
 
-    // Verify ownership
     const { data: existing } = await supabaseAdmin
       .from("brands")
-      .select("id, brand_dna")
+      .select("id, brand_dna, target_audience")
       .eq("id", brand_id)
       .eq("user_id", user.id)
       .single();
@@ -62,7 +34,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Brand not found" }, { status: 404 });
     }
 
-    // Build update object — only include fields that were provided
     const updates: Record<string, unknown> = {};
     if (brand_name !== undefined) updates.brand_name = brand_name;
     if (brand_description !== undefined) updates.brand_description = brand_description;
@@ -72,20 +43,14 @@ export async function POST(req: NextRequest) {
     if (logo_url !== undefined) updates.logo_url = logo_url;
 
     if (age_range !== undefined || gender !== undefined || psychographics !== undefined) {
-      const { data: current } = await supabaseAdmin
-        .from("brands")
-        .select("target_audience")
-        .eq("id", brand_id)
-        .single();
       updates.target_audience = {
-        ...current?.target_audience,
+        ...existing.target_audience,
         ...(age_range !== undefined && { age_range }),
         ...(gender !== undefined && { gender }),
         ...(psychographics !== undefined && { psychographics }),
       };
     }
 
-    // Update image preferences inside brand_dna
     if (image_color !== undefined || image_people !== undefined || image_finish !== undefined) {
       const currentDna = existing.brand_dna || {};
       updates.brand_dna = {

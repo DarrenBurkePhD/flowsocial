@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient } from "@supabase/supabase-js";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const supabaseAdmin = createClient(
+const supabaseAdmin = createSupabaseAdmin(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!
 );
@@ -33,14 +32,12 @@ function buildImageStylePrompt(color: string, people: string, finish: string): s
     warm_golden: "warm golden-hour tones, rich amber and honey hues",
     dark_dramatic: "dark and dramatic lighting, deep shadows, high contrast moody tones",
   };
-
   const peopleMap: Record<string, string> = {
     no_people: "no people — product and lifestyle objects only, no human figures",
     athletes: "featuring athletes and active people in training or sport environments",
     lifestyle_people: "featuring real people in everyday lifestyle moments",
     mix: "alternating between product-focused shots and lifestyle shots with people",
   };
-
   const finishMap: Record<string, string> = {
     clean_clinical: "clean clinical aesthetic, sharp focus, precise composition, scientific precision",
     bright_airy: "bright and airy feel, lots of negative space, light and optimistic mood",
@@ -48,31 +45,14 @@ function buildImageStylePrompt(color: string, people: string, finish: string): s
     luxury_refined: "luxury and refined, aspirational, premium materials and surfaces",
     natural_organic: "natural and organic, earthy textures, wholesome and grounded",
   };
-
   return `${colorMap[color] || colorMap.full_color}. ${peopleMap[people] || peopleMap.mix}. ${finishMap[finish] || finishMap.clean_clinical}.`;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabaseAuth = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return cookieStore.getAll(); },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {}
-          },
-        },
-      }
-    );
+    const supabase = await createClient();
 
-    const { data: { user } } = await supabaseAuth.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
@@ -116,20 +96,14 @@ Brand voice: ${brand_voice.join(", ")}
 Image style preferences: ${imageStylePrompt}
 ${websiteSection}
 
-Using ALL of the above especially the scraped website content, identify:
-- The actual products and what makes them unique
-- The real brand language and tone from the website copy
-- The specific customer problems being solved
-- The brand values and mission
-
 Return ONLY a valid JSON object with exactly these keys:
 {
   "brand_dna": "2-3 sentences capturing the brand essence, specific to their actual products and mission",
   "products": ["specific product 1", "specific product 2", "specific product 3"],
   "content_pillars": ["pillar 1", "pillar 2", "pillar 3", "pillar 4", "pillar 5"],
-  "tone_guidelines": "2-3 sentences on how to write captions for this brand. Be specific about sentence length, vocabulary, and emotional register.",
-  "aesthetic_direction": "2-3 sentences describing the visual world of this brand. Include lighting, color palette, subject matter, and mood.",
-  "image_style": "Detailed photography direction for DALL-E incorporating these style preferences: ${imageStylePrompt} -- Describe setting, lighting, color grading, subject, mood. Be specific enough to produce consistent results across 7 images.",
+  "tone_guidelines": "2-3 sentences on how to write captions for this brand.",
+  "aesthetic_direction": "2-3 sentences describing the visual world of this brand.",
+  "image_style": "Detailed photography direction for DALL-E incorporating these style preferences: ${imageStylePrompt}",
   "hashtag_strategy": {
     "niche": ["tag1", "tag2", "tag3", "tag4", "tag5"],
     "mid": ["tag1", "tag2", "tag3", "tag4", "tag5"],
@@ -137,19 +111,13 @@ Return ONLY a valid JSON object with exactly these keys:
   },
   "cta_library": ["cta 1", "cta 2", "cta 3", "cta 4", "cta 5"]
 }
-
-Rules:
-- No em dashes anywhere in the output
-- Be hyper-specific to this brand. No generic marketing language.
-- Products must be real products found on their website, not invented ones
-- image_style must incorporate the founder's specific style preferences above`,
+Rules: No em dashes. Be hyper-specific. Products must be real. image_style must be detailed enough for consistent DALL-E results.`,
       }],
     });
 
     const responseText = message.content[0].type === "text" ? message.content[0].text : "";
     const cleanedResponse = responseText.replace(/```json\n?|\n?```/g, "").trim();
     const brandAnalysis = JSON.parse(cleanedResponse);
-
     const imagePreferences = { color: image_color, people: image_people, finish: image_finish };
 
     const { data: brand, error } = await supabaseAdmin
