@@ -6,14 +6,20 @@ import { useSearchParams } from "next/navigation";
 function UpgradeContent() {
   const [loading, setLoading] = useState(false);
   const [brandId, setBrandId] = useState<string | null>(null);
+  const [brandName, setBrandName] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const cancelled = searchParams.get("cancelled");
   const trialExpired = searchParams.get("trial_expired");
 
   useEffect(() => {
-    // Get brand_id from localStorage so we can redirect back after payment
     const stored = localStorage.getItem("last_brand_id");
-    if (stored) setBrandId(stored);
+    if (stored) {
+      setBrandId(stored);
+      fetch(`/api/get-brand?brand_id=${stored}`)
+        .then((r) => r.json())
+        .then((d) => { if (d.brand?.brand_name) setBrandName(d.brand.brand_name); })
+        .catch(() => {});
+    }
   }, []);
 
   async function handleUpgrade() {
@@ -25,9 +31,7 @@ function UpgradeContent() {
         body: JSON.stringify({ brand_id: brandId }),
       });
       const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      }
+      if (data.url) window.location.href = data.url;
     } catch (err) {
       console.error(err);
       setLoading(false);
@@ -35,100 +39,103 @@ function UpgradeContent() {
   }
 
   return (
-    <div
-      style={{ backgroundColor: "#0A0A0A", minHeight: "100vh" }}
-      className="flex items-center justify-center px-4"
-    >
-      <div className="max-w-lg w-full text-center">
-        {/* Logo / wordmark */}
-        <p className="text-sm tracking-widest uppercase mb-8" style={{ color: "#C4A882" }}>
-          Flow Social
-        </p>
+    <main style={{ minHeight: "100vh", background: "#0A0A0A", color: "#F0EDE6", fontFamily: "'DM Sans', sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px" }}>
 
-        {trialExpired ? (
-          <>
-            <h1
-              className="text-4xl mb-4"
-              style={{ fontFamily: "DM Serif Display, serif", color: "#F0EDE6" }}
-            >
-              Your free trial has ended
-            </h1>
-            <p className="text-base mb-10" style={{ color: "#888" }}>
-              You had 14 days on us. To keep generating content and scheduling
-              to Instagram, upgrade to Flow Social Pro.
-            </p>
-          </>
-        ) : (
-          <>
-            <h1
-              className="text-4xl mb-4"
-              style={{ fontFamily: "DM Serif Display, serif", color: "#F0EDE6" }}
-            >
-              Unlock Flow Social Pro
-            </h1>
-            <p className="text-base mb-10" style={{ color: "#888" }}>
-              Everything you need to run a world-class Instagram presence
-              without the agency price tag.
-            </p>
-          </>
-        )}
+      {/* Logo */}
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "48px" }}>
+        <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+          <rect width="32" height="32" rx="8" fill="#C4A882"/>
+          <path d="M8 22 C8 22 12 10 16 10 C20 10 20 16 24 12" stroke="#0A0A0A" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+          <circle cx="24" cy="12" r="2.5" fill="#0A0A0A"/>
+          <circle cx="8" cy="22" r="2" fill="#0A0A0A"/>
+        </svg>
+        <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: "18px", color: "#F0EDE6" }}>Flow Social</span>
+      </div>
+
+      <div style={{ width: "100%", maxWidth: "440px" }}>
+
+        {/* Header */}
+        <div style={{ textAlign: "center", marginBottom: "32px" }}>
+          {trialExpired ? (
+            <>
+              {brandName && (
+                <div style={{ fontSize: "12px", color: "#C4A882", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "16px", fontWeight: 500 }}>
+                  {brandName} is ready to grow
+                </div>
+              )}
+              <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "32px", color: "#F0EDE6", margin: "0 0 12px", lineHeight: 1.2 }}>
+                Your free trial has ended
+              </h1>
+              <p style={{ fontSize: "15px", color: "#6B6760", margin: 0, lineHeight: 1.6 }}>
+                Your brand DNA, content strategy, and posts are all saved. Pick up exactly where you left off.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "32px", color: "#F0EDE6", margin: "0 0 12px", lineHeight: 1.2 }}>
+                One plan. Everything included.
+              </h1>
+              <p style={{ fontSize: "15px", color: "#6B6760", margin: 0, lineHeight: 1.6 }}>
+                A world-class Instagram presence without the agency price tag.
+              </p>
+            </>
+          )}
+        </div>
 
         {/* Pricing card */}
-        <div
-          className="rounded-2xl p-8 mb-8 text-left"
-          style={{ backgroundColor: "#111111", border: "1px solid #222" }}
-        >
-          <div className="flex items-end gap-2 mb-6">
-            <span
-              className="text-5xl font-bold"
-              style={{ color: "#F0EDE6", fontFamily: "DM Serif Display, serif" }}
-            >
-              $97
-            </span>
-            <span className="text-base mb-2" style={{ color: "#888" }}>/ month</span>
+        <div style={{ background: "#111111", border: "0.5px solid rgba(240,237,230,0.08)", borderRadius: "16px", padding: "28px", marginBottom: "16px" }}>
+
+          {/* Price */}
+          <div style={{ display: "flex", alignItems: "flex-end", gap: "6px", marginBottom: "24px", paddingBottom: "24px", borderBottom: "0.5px solid rgba(240,237,230,0.06)" }}>
+            <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: "52px", color: "#F0EDE6", lineHeight: 1 }}>$97</span>
+            <span style={{ fontSize: "14px", color: "#4A4845", marginBottom: "8px" }}>/ month</span>
           </div>
 
-          <ul className="space-y-3 mb-0">
+          {/* Features */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             {[
-              "7 AI-generated posts every week",
-              "DALL-E images matched to your brand",
-              "Auto-scheduled to Instagram via Buffer",
-              "Brand DNA that evolves with you",
-              "Cancel anytime",
-            ].map((feature) => (
-              <li key={feature} className="flex items-center gap-3">
-                <span style={{ color: "#C4A882" }}>✓</span>
-                <span style={{ color: "#F0EDE6" }} className="text-sm">{feature}</span>
-              </li>
+              ["7 posts generated every week", "Captions, hashtags, CTAs — all on-brand"],
+              ["Your images mixed with curated stock", "Brand assets + Pexels photography"],
+              ["Auto-scheduled via Buffer", "Posts go out without you lifting a finger"],
+              ["Brand DNA that learns your voice", "Gets sharper every week"],
+              ["Cancel anytime", "No contracts, no catch"],
+            ].map(([title, desc]) => (
+              <div key={title} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                <span style={{ color: "#C4A882", fontSize: "14px", marginTop: "1px", flexShrink: 0 }}>✓</span>
+                <div>
+                  <div style={{ fontSize: "14px", color: "#F0EDE6", fontWeight: 500, marginBottom: "1px" }}>{title}</div>
+                  <div style={{ fontSize: "12px", color: "#4A4845" }}>{desc}</div>
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
+        </div>
+
+        {/* Comparison nudge */}
+        <div style={{ textAlign: "center", marginBottom: "20px" }}>
+          <span style={{ fontSize: "12px", color: "#3A3835" }}>Less than one hour of agency time. Cancel anytime.</span>
         </div>
 
         {cancelled && (
-          <p className="text-sm mb-4" style={{ color: "#888" }}>
-            No worries — your content is still here whenever you are ready.
-          </p>
+          <div style={{ background: "rgba(196,168,130,0.06)", border: "0.5px solid rgba(196,168,130,0.15)", borderRadius: "10px", padding: "12px 16px", marginBottom: "16px", textAlign: "center" }}>
+            <p style={{ fontSize: "13px", color: "#6B6760", margin: 0 }}>No worries — your content is saved and ready whenever you are.</p>
+          </div>
         )}
 
+        {/* CTA */}
         <button
           onClick={handleUpgrade}
           disabled={loading}
-          className="w-full py-4 rounded-xl text-base font-medium transition-opacity"
-          style={{
-            backgroundColor: "#C4A882",
-            color: "#0A0A0A",
-            opacity: loading ? 0.6 : 1,
-            cursor: loading ? "not-allowed" : "pointer",
-          }}
-        >
-          {loading ? "Redirecting to checkout..." : "Start Flow Social Pro — $97/month"}
+          style={{ width: "100%", background: loading ? "#1E1E1C" : "#C4A882", color: loading ? "#4A4845" : "#0A0A0A", border: "none", borderRadius: "100px", padding: "18px", fontSize: "16px", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", transition: "opacity 0.2s", letterSpacing: "0.2px" }}>
+          {loading ? "Redirecting to checkout..." : trialExpired ? "Continue with Flow Social — $97/month" : "Start Flow Social Pro — $97/month"}
         </button>
 
-        <p className="text-xs mt-4" style={{ color: "#555" }}>
+        <p style={{ fontSize: "12px", color: "#3A3835", textAlign: "center", marginTop: "14px" }}>
           Secured by Stripe. Cancel anytime from your account settings.
         </p>
+
       </div>
-    </div>
+    </main>
   );
 }
 
