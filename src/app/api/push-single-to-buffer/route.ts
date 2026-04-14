@@ -36,42 +36,62 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const scheduledAt = toHalifaxUTC(post_date, posting_time);
-    console.log("Scheduling to Buffer:", { profile_id, scheduledAt });
+    const dueAt = toHalifaxUTC(post_date, posting_time);
+    console.log("Scheduling to Buffer:", { profile_id, dueAt });
 
-    const params: Record<string, string> = {
-      "profile_ids[]": profile_id,
-      "text": caption,
-      "scheduled_at": scheduledAt,
+    const mutation = `
+      mutation CreatePost($input: CreatePostInput!) {
+        createPost(input: $input) {
+          ... on PostActionSuccess {
+            post {
+              id
+              dueAt
+            }
+          }
+          ... on MutationError {
+            message
+          }
+        }
+      }
+    `;
+
+    const variables = {
+      input: {
+        channelId: profile_id,
+        text: caption,
+        schedulingType: "automatic",
+        mode: "customScheduled",
+        dueAt,
+        ...(image_url ? { assets: [{ url: image_url, type: "image" }] } : {}),
+      },
     };
 
-    if (image_url) {
-      params["media[photo]"] = image_url;
-    }
-
-    const formBody = Object.entries(params)
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-      .join("&");
-
-    const response = await fetch("https://api.bufferapp.com/1/updates/create.json", {
+    const response = await fetch("https://api.buffer.com/graphql", {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/json",
         "Authorization": `Bearer ${process.env.BUFFER_ACCESS_TOKEN}`,
       },
-      body: formBody,
+      body: JSON.stringify({ query: mutation, variables }),
     });
 
     const data = await response.json();
-    console.log("Buffer REST response:", JSON.stringify(data));
+    console.log("Buffer response:", JSON.stringify(data));
 
-    if (!response.ok || data.error) {
-      console.error("Buffer API error:", data);
-      return NextResponse.json({ error: data.error || "Buffer API error", details: data }, { status: 500 });
+    if (data.errors) {
+      console.error("Buffer GraphQL errors:", data.errors);
+      return NextResponse.json({ error: "Buffer API error", details: data.errors }, { status: 500 });
     }
 
-    const bufferId = data.updates?.[0]?.id || data.update?.id;
-    return NextResponse.json({ success: true, buffer_id: bufferId, scheduledAt });
+    const result = data.data?.createPost;
+
+    if (result?.message) {
+      console.error("Buffer mutation error:", result.message);
+      return NextResponse.json({ error: result.message }, { status: 500 });
+    }
+
+    const post = result?.post;
+    return NextResponse.json({ success: true, buffer_id: post?.id, dueAt });
 
   } catch (error) {
     console.error("push-single-to-buffer error:", error);
