@@ -10,14 +10,13 @@ function nthSundayOfMonth(year: number, month: number, n: number): Date {
 function getHalifaxOffset(dateStr: string): string {
   const d = new Date(`${dateStr}T12:00:00Z`);
   const year = d.getUTCFullYear();
-  const dstStart = nthSundayOfMonth(year, 2, 2); // 2nd Sunday of March
-  const dstEnd = nthSundayOfMonth(year, 10, 1);  // 1st Sunday of November
+  const dstStart = nthSundayOfMonth(year, 2, 2);
+  const dstEnd = nthSundayOfMonth(year, 10, 1);
   return d >= dstStart && d < dstEnd ? "-03:00" : "-04:00";
 }
 
 function toHalifaxUTC(dateStr: string, timeStr: string): string {
   const offset = getHalifaxOffset(dateStr);
-  // timeStr may be "HH:MM" or "HH:MM:SS"
   const time = timeStr.length === 5 ? `${timeStr}:00` : timeStr;
   return new Date(`${dateStr}T${time}${offset}`).toISOString();
 }
@@ -37,58 +36,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const dueAt = toHalifaxUTC(post_date, posting_time);
+    const scheduledAt = toHalifaxUTC(post_date, posting_time);
+    const scheduledTimestamp = Math.floor(new Date(scheduledAt).getTime() / 1000);
 
-    const mutation = `
-      mutation CreatePost($input: PostCreateInput!) {
-        postCreate(input: $input) {
-          post {
-            id
-            dueAt
-            status
-          }
-          errors {
-            message
-          }
-        }
-      }
-    `;
+    console.log("Scheduling to Buffer:", { profile_id, scheduledAt, scheduledTimestamp });
 
-    const variables = {
-      input: {
-        profileIds: [profile_id],
-        text: caption,
-        dueAt,
-        mode: "customScheduled",
-        metadata: {
-          instagram: {
-            type: "post",
-            shouldShareToFeed: true,
-          },
-        },
-        ...(image_url ? { assets: { images: [{ url: image_url }] } } : {}),
-      },
+    // Build form data for Buffer REST API v1
+    const params: Record<string, string> = {
+      profile_ids[]: profile_id,
+      text: caption,
+      scheduled_at: scheduledAt,
     };
 
-    const response = await fetch("https://api.buffer.com/graphql", {
+    if (image_url) {
+      params["media[photo]"] = image_url;
+    }
+
+    const formBody = Object.entries(params)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+      .join("&");
+
+    const response = await fetch("https://api.bufferapp.com/1/updates/create.json", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.BUFFER_ACCESS_TOKEN}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": `Bearer ${process.env.BUFFER_ACCESS_TOKEN}`,
       },
-      body: JSON.stringify({ query: mutation, variables }),
+      body: formBody,
     });
 
     const data = await response.json();
+    console.log("Buffer REST response:", JSON.stringify(data));
 
-    if (data.errors || data.data?.postCreate?.errors?.length > 0) {
-      const errors = data.errors || data.data.postCreate.errors;
-      console.error("Buffer API errors:", errors);
-      return NextResponse.json({ error: "Buffer API error", details: errors }, { status: 500 });
+    if (!response.ok || data.error) {
+      console.error("Buffer API error:", data);
+      return NextResponse.json({ error: data.error || "Buffer API error", details: data }, { status: 500 });
     }
 
-    const post = data.data?.postCreate?.post;
-    return NextResponse.json({ success: true, post, dueAt });
+    const bufferId = data.updates?.[0]?.id || data.update?.id;
+    return NextResponse.json({ success: true, buffer_id: bufferId, scheduledAt });
+
   } catch (error) {
     console.error("push-single-to-buffer error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
