@@ -37,15 +37,12 @@ export async function POST(request: NextRequest) {
     }
 
     const scheduledAt = toHalifaxUTC(post_date, posting_time);
-    const scheduledTimestamp = Math.floor(new Date(scheduledAt).getTime() / 1000);
+    console.log("Scheduling to Buffer:", { profile_id, scheduledAt });
 
-    console.log("Scheduling to Buffer:", { profile_id, scheduledAt, scheduledTimestamp });
-
-    // Build form data for Buffer REST API v1
     const params: Record<string, string> = {
-      profile_ids[]: profile_id,
-      text: caption,
-      scheduled_at: scheduledAt,
+      "profile_ids[]": profile_id,
+      "text": caption,
+      "scheduled_at": scheduledAt,
     };
 
     if (image_url) {
