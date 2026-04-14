@@ -39,26 +39,23 @@ export async function POST(request: NextRequest) {
     const dueAt = toHalifaxUTC(post_date, posting_time);
     console.log("Scheduling to Buffer:", { profile_id, dueAt });
 
-    const input: Record<string, unknown> = {
-      channelId: profile_id,
-      text: caption,
-      schedulingType: "automatic",
-      mode: "customScheduled",
-      dueAt,
-    };
+    // Use inline query with enum values (not variables) to avoid type issues
+    const imageAssets = image_url
+      ? `assets: { images: [{ url: "${image_url}" }] }`
+      : "";
 
-    if (image_url) {
-      input.assets = { images: [{ url: image_url }] };
-    }
-
-    const mutation = `
-      mutation CreatePost($input: CreatePostInput!) {
-        createPost(input: $input) {
+    const query = `
+      mutation {
+        createPost(input: {
+          channelId: "${profile_id}",
+          text: ${JSON.stringify(caption)},
+          schedulingType: automatic,
+          mode: customScheduled,
+          dueAt: "${dueAt}"
+          ${imageAssets}
+        }) {
           ... on PostActionSuccess {
-            post {
-              id
-              dueAt
-            }
+            post { id dueAt }
           }
           ... on MutationError {
             message
@@ -67,36 +64,45 @@ export async function POST(request: NextRequest) {
       }
     `;
 
+    console.log("Query preview:", query.substring(0, 300));
+
     const response = await fetch("https://api.buffer.com/graphql", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${process.env.BUFFER_ACCESS_TOKEN}`,
       },
-      body: JSON.stringify({ query: mutation, variables: { input } }),
+      body: JSON.stringify({ query }),
     });
 
-    const data = await response.json();
-    console.log("Buffer response:", JSON.stringify(data));
+    console.log("Buffer HTTP status:", response.status, response.statusText);
+
+    const text = await response.text();
+    console.log("Buffer raw response:", text.substring(0, 500));
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return NextResponse.json({ error: "Buffer returned non-JSON", body: text }, { status: 500 });
+    }
 
     if (data.errors) {
-      console.error("Buffer GraphQL errors:", JSON.stringify(data.errors));
+      console.error("Buffer errors:", JSON.stringify(data.errors));
       return NextResponse.json({ error: "Buffer API error", details: data.errors }, { status: 500 });
     }
 
     const result = data.data?.createPost;
-
     if (result?.message) {
-      console.error("Buffer mutation error:", result.message);
       return NextResponse.json({ error: result.message }, { status: 500 });
     }
 
     const post = result?.post;
-    console.log("Scheduled successfully:", post);
+    console.log("Scheduled successfully:", JSON.stringify(post));
     return NextResponse.json({ success: true, buffer_id: post?.id, dueAt });
 
   } catch (error) {
-    console.error("push-single-to-buffer error:", error);
+    console.error("push-single-to-buffer error:", String(error));
     return NextResponse.json({ error: "Internal server error", details: String(error) }, { status: 500 });
   }
 }
