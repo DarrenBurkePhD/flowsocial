@@ -1,42 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-03-31.basil",
 });
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Check if customer already exists
-    const { data: existing } = await supabase
-      .from("subscriptions")
-      .select("stripe_customer_id")
-      .eq("user_id", user.id)
-      .single();
-
-    let customerId = existing?.stripe_customer_id;
-
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        metadata: { supabase_user_id: user.id },
-      });
-      customerId = customer.id;
-    }
-
-    const { brand_id } = await request.json();
+    const { brand_id } = await req.json();
 
     const session = await stripe.checkout.sessions.create({
-      customer: customerId,
+      payment_method_types: ["card"],
       mode: "subscription",
+      customer_email: user.email,
       line_items: [
         {
           price: process.env.STRIPE_PRICE_ID!,
@@ -44,15 +28,25 @@ export async function POST(request: NextRequest) {
         },
       ],
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/${brand_id}?upgraded=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/upgrade?cancelled=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/upgrade`,
+      metadata: {
+        user_id: user.id,
+        brand_id: brand_id || "",
+      },
       subscription_data: {
-        metadata: { supabase_user_id: user.id },
+        metadata: {
+          user_id: user.id,
+        },
       },
     });
 
     return NextResponse.json({ url: session.url });
-  } catch (error) {
-    console.error("Stripe checkout error:", error);
-    return NextResponse.json({ error: "Failed to create checkout session" }, { status: 500 });
+
+  } catch (err: unknown) {
+    console.error("Stripe checkout error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Checkout failed" },
+      { status: 500 }
+    );
   }
 }
