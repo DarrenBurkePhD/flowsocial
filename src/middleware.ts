@@ -39,7 +39,7 @@ export async function middleware(request: NextRequest) {
     .from("subscriptions")
     .select("status, trial_ends_at, current_period_ends_at")
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
 
   const now = new Date();
 
