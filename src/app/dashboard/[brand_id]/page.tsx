@@ -242,7 +242,6 @@ export default function DashboardPage() {
             post_date: piece.post_date,
             posting_time: piece.posting_time,
             image_url: piece.image_url || null,
-            content_type: piece.content_type,
           }),
         });
         const data = await res.json();
@@ -323,7 +322,7 @@ export default function DashboardPage() {
 
         /* Mobile stacked layout */
         @media (max-width: 600px) {
-          .nav-btn-settings { display: none; }
+          .nav-btn-settings { display: block; }
           .post-row { flex-direction: column; gap: 0; }
 
           .mobile-top-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }

@@ -217,11 +217,11 @@ export default function OnboardingPage() {
               </div>
               <div>
                 <label style={labelStyle}>Brand name</label>
-                <input type="text" value={form.brand_name} onChange={(e) => updateField("brand_name", e.target.value)} placeholder="e.g. Headstrong" style={inputStyle} />
+                <input type="text" value={form.brand_name} onChange={(e) => updateField("brand_name", e.target.value)} placeholder="Your brand name" style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>What does your brand do?</label>
-                <textarea value={form.brand_description} onChange={(e) => updateField("brand_description", e.target.value)} placeholder="e.g. We make brain-first supplements for contact sport athletes." rows={3} style={{ ...inputStyle, resize: "none" }} />
+                <textarea value={form.brand_description} onChange={(e) => updateField("brand_description", e.target.value)} placeholder="What does your brand make or do?" rows={3} style={{ ...inputStyle, resize: "none" }} />
               </div>
               <div>
                 <label style={labelStyle}>Website URL</label>
@@ -230,7 +230,7 @@ export default function OnboardingPage() {
               </div>
               <div>
                 <label style={labelStyle}>Buffer Profile ID</label>
-                <input type="text" value={form.buffer_profile_id} onChange={(e) => updateField("buffer_profile_id", e.target.value)} placeholder="e.g. 68a9f9053d2fbc20d49ad446" style={inputStyle} />
+                <input type="text" value={form.buffer_profile_id} onChange={(e) => updateField("buffer_profile_id", e.target.value)} placeholder="Paste your Buffer Profile ID here" style={inputStyle} />
                 <button
                   onClick={() => setBufferGuideOpen(!bufferGuideOpen)}
                   style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 0 0", display: "flex", alignItems: "center", gap: "5px" }}
