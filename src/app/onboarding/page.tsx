@@ -270,7 +270,7 @@ export default function OnboardingPage() {
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ display: "inline-block", marginTop: "14px", fontSize: "12px", color: "#C4A882", textDecoration: "none", border: "0.5px solid rgba(196,168,130,0.3)", borderRadius: "100px", padding: "6px 14px" }}
-                      Open Buffer →
+                    >
                       Open Buffer →
                     </a>
                   </div>
