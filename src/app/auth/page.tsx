@@ -13,6 +13,14 @@ function AuthForm() {
   const [error, setError] = useState("");
 
   const errorParam = searchParams.get("error");
+  const rawError = errorParam ? decodeURIComponent(errorParam) : "";
+  const friendlyError = rawError.includes("otp") || rawError.includes("link")
+    ? "That magic link has expired or already been used. Request a new one below."
+    : rawError.includes("rate")
+    ? "Too many attempts. Please wait a minute and try again."
+    : rawError
+    ? "Could not sign in. Please try again."
+    : "";
 
   useEffect(() => {
     const supabase = createClient();
@@ -73,7 +81,7 @@ function AuthForm() {
       {!sent ? (
         <div style={{ background: "#111111", border: "0.5px solid rgba(240,237,230,0.08)", borderRadius: "16px", padding: "40px" }}>
           <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "28px", color: "#F0EDE6", margin: "0 0 8px", lineHeight: 1.2 }}>
-            Welcome back
+            Welcome to Flow Social
           </h1>
           <p style={{ fontSize: "14px", color: "#6B6760", margin: "0 0 32px", lineHeight: 1.6 }}>
             Enter your email and we will send you a magic link to sign in instantly. No password needed.
@@ -81,7 +89,7 @@ function AuthForm() {
 
           {(error || errorParam) && (
             <div style={{ background: "rgba(220,38,38,0.1)", border: "0.5px solid rgba(220,38,38,0.3)", borderRadius: "8px", padding: "12px 16px", marginBottom: "20px", fontSize: "13px", color: "#FCA5A5" }}>
-              {error || errorParam}
+              {error || friendlyError}
             </div>
           )}
 

@@ -37,12 +37,20 @@ export default function Home() {
           </svg>
           <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: "20px", color: "#F0EDE6", letterSpacing: "-0.3px" }}>Flow Social</span>
         </div>
-        <Link
-          href="/onboarding"
-          style={{ background: "#F0EDE6", color: "#0A0A0A", padding: "10px 22px", borderRadius: "100px", fontSize: "13px", fontWeight: 500, textDecoration: "none" }}
-        >
-          Start free trial
-        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <Link
+            href="/auth"
+            style={{ background: "transparent", color: "#9E9A93", padding: "10px 18px", borderRadius: "100px", fontSize: "13px", fontWeight: 400, textDecoration: "none", border: "0.5px solid rgba(240,237,230,0.15)" }}
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/onboarding"
+            style={{ background: "#F0EDE6", color: "#0A0A0A", padding: "10px 22px", borderRadius: "100px", fontSize: "13px", fontWeight: 500, textDecoration: "none" }}
+          >
+            Start free trial
+          </Link>
+        </div>
       </nav>
 
       {/* Hero */}
