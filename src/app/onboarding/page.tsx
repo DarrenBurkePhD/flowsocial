@@ -156,7 +156,7 @@ export default function OnboardingPage() {
           </svg>
           <div style={{ marginBottom: "48px" }}>
             {LOADING_STEPS.map((s, i) => (
-              <div key={i} style={{ fontSize: "15px", fontWeight: i === loadingStep ? 500 : 300, color: i === loadingStep ? "#F0EDE6" : i < loadingStep ? "#2A2825" : "#2A2825", marginBottom: "14px", transition: "all 0.5s ease", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px" }}>
+              <div key={i} style={{ fontSize: "15px", fontWeight: i === loadingStep ? 500 : 300, color: i === loadingStep ? "#F0EDE6" : "#2A2825", marginBottom: "14px", transition: "all 0.5s ease", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px" }}>
                 {i < loadingStep && <span style={{ color: "#C4A882", fontSize: "12px" }}>✓</span>}
                 {i === loadingStep && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#C4A882", display: "inline-block" }} />}
                 {i > loadingStep && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#1E1E1C", display: "inline-block" }} />}
@@ -191,7 +191,6 @@ export default function OnboardingPage() {
   return (
     <main style={{ minHeight: "100vh", background: "#0A0A0A", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", fontFamily: "'DM Sans', sans-serif" }}>
       <div style={{ width: "100%", maxWidth: "520px" }}>
-
         <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "40px", justifyContent: "center" }}>
           <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
             <rect width="32" height="32" rx="8" fill="#C4A882"/>
@@ -203,7 +202,6 @@ export default function OnboardingPage() {
         </div>
 
         <div style={{ background: "#111111", border: "0.5px solid rgba(240,237,230,0.08)", borderRadius: "16px", padding: "40px" }}>
-
           <div style={{ display: "flex", gap: "6px", marginBottom: "32px" }}>
             {[1, 2, 3, 4].map((s) => (
               <div key={s} style={{ height: "3px", flex: 1, borderRadius: "100px", background: s <= step ? "#C4A882" : "#1E1E1C", transition: "background 0.3s" }} />
@@ -230,17 +228,9 @@ export default function OnboardingPage() {
                 <input type="url" value={form.website_url} onChange={(e) => updateField("website_url", e.target.value)} placeholder="https://yourbrand.com" style={inputStyle} />
                 <p style={{ fontSize: "12px", color: "#4A4845", marginTop: "6px" }}>We will scan your site to understand your products and brand voice.</p>
               </div>
-
-              {/* Buffer Profile ID with expandable guide */}
               <div>
                 <label style={labelStyle}>Buffer Profile ID</label>
-                <input
-                  type="text"
-                  value={form.buffer_profile_id}
-                  onChange={(e) => updateField("buffer_profile_id", e.target.value)}
-                  placeholder="e.g. 68a9f9053d2fbc20d49ad446"
-                  style={inputStyle}
-                />
+                <input type="text" value={form.buffer_profile_id} onChange={(e) => updateField("buffer_profile_id", e.target.value)} placeholder="e.g. 68a9f9053d2fbc20d49ad446" style={inputStyle} />
                 <button
                   onClick={() => setBufferGuideOpen(!bufferGuideOpen)}
                   style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 0 0", display: "flex", alignItems: "center", gap: "5px" }}
@@ -249,7 +239,6 @@ export default function OnboardingPage() {
                     {bufferGuideOpen ? "▾" : "▸"} How to set up Buffer and get your Profile ID
                   </span>
                 </button>
-
                 {bufferGuideOpen && (
                   <div style={{ marginTop: "10px", background: "#0A0A0A", border: "0.5px solid rgba(196,168,130,0.15)", borderRadius: "10px", padding: "16px 18px" }}>
                     <p style={{ fontSize: "12px", color: "#6B6760", margin: "0 0 12px", lineHeight: 1.5 }}>
@@ -271,12 +260,11 @@ export default function OnboardingPage() {
                       rel="noopener noreferrer"
                       style={{ display: "inline-block", marginTop: "14px", fontSize: "12px", color: "#C4A882", textDecoration: "none", border: "0.5px solid rgba(196,168,130,0.3)", borderRadius: "100px", padding: "6px 14px" }}
                     >
-                      Open Buffer →
+                      Open Buffer
                     </a>
                   </div>
                 )}
               </div>
-
               <button onClick={() => setStep(2)} disabled={!form.brand_name || !form.brand_description} style={btnPrimary(!form.brand_name || !form.brand_description)}>Continue</button>
             </div>
           )}
@@ -351,7 +339,6 @@ export default function OnboardingPage() {
                 <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "28px", color: "#F0EDE6", margin: "0 0 4px" }}>How should your images look?</h2>
                 <p style={{ fontSize: "14px", color: "#6B6760", margin: 0, lineHeight: 1.6 }}>These preferences shape every image we generate for your brand.</p>
               </div>
-
               <div>
                 <label style={labelStyle}>Color treatment</label>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -360,7 +347,6 @@ export default function OnboardingPage() {
                   ))}
                 </div>
               </div>
-
               <div>
                 <label style={labelStyle}>People in images</label>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -369,7 +355,6 @@ export default function OnboardingPage() {
                   ))}
                 </div>
               </div>
-
               <div>
                 <label style={labelStyle}>Overall finish</label>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -378,13 +363,10 @@ export default function OnboardingPage() {
                   ))}
                 </div>
               </div>
-
               {error && <p style={{ color: "#EF4444", fontSize: "14px", margin: 0 }}>{error}</p>}
               <div style={{ display: "flex", gap: "12px" }}>
                 <button onClick={() => setStep(3)} style={btnBack}>Back</button>
-                <button onClick={handleSubmit} disabled={loading} style={{ ...btnPrimary(false), width: "auto", flex: 1 }}>
-                  Build my brand DNA →
-                </button>
+                <button onClick={handleSubmit} disabled={loading} style={{ ...btnPrimary(false), width: "auto", flex: 1 }}>Build my brand DNA</button>
               </div>
             </div>
           )}
