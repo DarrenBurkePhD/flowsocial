@@ -16,6 +16,7 @@ type ContentPiece = {
   posting_time: string;
   status: string;
   image_url?: string;
+  image_source?: "brand" | "unsplash" | "ai" | null;
   buffer_id?: string;
 };
 
@@ -26,11 +27,10 @@ type Brand = {
   buffer_profile_id?: string;
   brand_dna?: {
     image_style?: string;
-    image_preferences?: {
-      color?: string;
-      people?: string;
-      finish?: string;
-    };
+    image_preferences?: { color?: string; people?: string; finish?: string };
+    aesthetic_direction?: string;
+    content_pillars?: string[];
+    products?: string[];
   };
 };
 
@@ -40,6 +40,53 @@ type ContentPackage = {
   content_pieces: ContentPiece[];
   week_start_date: string;
 };
+
+type BrandAsset = {
+  id: string;
+  public_url: string;
+  asset_type: string;
+};
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+async function fetchUnsplashImages(brandDna: Brand["brand_dna"], count: number): Promise<{ url: string; source: "unsplash" }[]> {
+  const parts: string[] = [];
+  if (brandDna?.aesthetic_direction) parts.push(brandDna.aesthetic_direction.split(" ").slice(0, 3).join(" "));
+  if (brandDna?.content_pillars?.length) parts.push(brandDna.content_pillars[0]);
+  if (brandDna?.products?.length) parts.push(brandDna.products[0].split(" ").slice(0, 2).join(" "));
+  const query = parts.join(" ").trim() || "lifestyle product photography";
+  try {
+    const res = await fetch(`/api/unsplash-search?query=${encodeURIComponent(query)}&count=${Math.max(count * 2, 10)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.photos || []).map((p: { url: string }) => ({ url: p.url, source: "unsplash" as const }));
+  } catch {
+    return [];
+  }
+}
+
+async function assignImages(pieces: ContentPiece[], brandAssets: BrandAsset[], brandDna: Brand["brand_dna"]): Promise<ContentPiece[]> {
+  const count = pieces.length;
+  const hasBrandAssets = brandAssets.length > 0;
+  const brandCount = hasBrandAssets ? Math.round(count * 0.6) : 0;
+  const unsplashCount = count - brandCount;
+  const unsplashPool = await fetchUnsplashImages(brandDna, unsplashCount);
+  const brandPool = shuffle([...brandAssets]).slice(0, brandCount).map((a) => ({ url: a.public_url, source: "brand" as const }));
+  const unsplashSlots = shuffle([...unsplashPool]).slice(0, unsplashCount);
+  const allSlots: { url: string; source: "brand" | "unsplash" }[] = shuffle([...brandPool, ...unsplashSlots]);
+  return pieces.map((piece, i) => ({
+    ...piece,
+    image_url: allSlots[i]?.url || piece.image_url || undefined,
+    image_source: allSlots[i]?.source || piece.image_source || null,
+  }));
+}
 
 function getWeekDates(startDate: string) {
   const dates = [];
@@ -59,10 +106,22 @@ function getWeekDates(startDate: string) {
 
 function formatScheduledTime(post_date: string, posting_time: string) {
   const date = new Date(`${post_date}T${posting_time}:00`);
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " at " + date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+}
+
+function ImageSourceBadge({ source }: { source?: "brand" | "unsplash" | "ai" | null }) {
+  if (!source) return null;
+  const config = {
+    brand: { label: "Yours", color: "#C4A882", bg: "rgba(196,168,130,0.15)" },
+    unsplash: { label: "Stock", color: "#9E9A93", bg: "rgba(158,154,147,0.12)" },
+    ai: { label: "AI", color: "#6B6760", bg: "rgba(107,103,96,0.15)" },
+  };
+  const c = config[source];
+  if (!c) return null;
   return (
-    date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
-    " at " +
-    date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+    <div style={{ position: "absolute", bottom: "4px", left: "4px", background: c.bg, borderRadius: "4px", padding: "1px 5px", fontSize: "8px", color: c.color, letterSpacing: "0.3px", fontWeight: 500 }}>
+      {c.label}
+    </div>
   );
 }
 
@@ -73,6 +132,7 @@ export default function DashboardPage() {
 
   const [brand, setBrand] = useState<Brand | null>(null);
   const [contentPackage, setContentPackage] = useState<ContentPackage | null>(null);
+  const [brandAssets, setBrandAssets] = useState<BrandAsset[]>([]);
   const [generating, setGenerating] = useState(false);
   const [generatingImages, setGeneratingImages] = useState<number[]>([]);
   const [regeneratingCaptions, setRegeneratingCaptions] = useState<number[]>([]);
@@ -87,6 +147,7 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchBrand();
     fetchLatestPackage();
+    fetchBrandAssets();
     checkSubscription();
     if (brand_id) localStorage.setItem("last_brand_id", brand_id);
   }, [brand_id]);
@@ -95,11 +156,7 @@ export default function DashboardPage() {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data } = await supabase
-      .from("subscriptions")
-      .select("status")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const { data } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
     if (data?.status === "active") setIsSubscribed(true);
   }
 
@@ -107,6 +164,14 @@ export default function DashboardPage() {
     const res = await fetch(`/api/get-brand?brand_id=${brand_id}`);
     const data = await res.json();
     if (data.brand) setBrand(data.brand);
+  }
+
+  async function fetchBrandAssets() {
+    try {
+      const res = await fetch(`/api/get-brand-assets?brand_id=${brand_id}`);
+      const data = await res.json();
+      if (data.assets) setBrandAssets(data.assets);
+    } catch { }
   }
 
   async function fetchLatestPackage() {
@@ -126,13 +191,16 @@ export default function DashboardPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setContentPackage({
+      const piecesWithImages = await assignImages(data.content_pieces, brandAssets, brand?.brand_dna);
+      const newPackage = {
         id: data.package_id,
         status: "ready_for_review",
-        content_pieces: data.content_pieces,
+        content_pieces: piecesWithImages,
         week_start_date: new Date().toISOString().split("T")[0],
-      });
-      showMessage("7 posts generated. Add images and approve to schedule.", "success");
+      };
+      setContentPackage(newPackage);
+      await persistPieces(data.package_id, piecesWithImages);
+      showMessage("7 posts ready. Review images and approve to schedule.", "success");
     } catch (err: unknown) {
       showMessage(err instanceof Error ? err.message : "Generation failed", "error");
     } finally {
@@ -158,7 +226,7 @@ export default function DashboardPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       const updated = [...contentPackage.content_pieces];
-      updated[index] = { ...updated[index], image_url: data.image_url };
+      updated[index] = { ...updated[index], image_url: data.image_url, image_source: "ai" };
       setContentPackage({ ...contentPackage, content_pieces: updated });
       await persistPieces(contentPackage.id, updated);
     } catch (err: unknown) {
@@ -177,13 +245,8 @@ export default function DashboardPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          brand_id,
-          concept: piece.concept,
-          content_type: piece.content_type,
-          content_pillar: piece.content_pillar,
-          cta: piece.cta,
-          hashtags: piece.hashtags,
-          current_caption: piece.caption,
+          brand_id, concept: piece.concept, content_type: piece.content_type,
+          content_pillar: piece.content_pillar, cta: piece.cta, hashtags: piece.hashtags, current_caption: piece.caption,
         }),
       });
       const data = await res.json();
@@ -206,8 +269,7 @@ export default function DashboardPage() {
   }
 
   function showMessage(msg: string, type: "success" | "error") {
-    setMessage(msg);
-    setMessageType(type);
+    setMessage(msg); setMessageType(type);
     setTimeout(() => setMessage(""), 5000);
   }
 
@@ -232,20 +294,16 @@ export default function DashboardPage() {
       }
       try {
         const cleanHashtags = piece.hashtags.map((h) => `#${h.replace(/#/g, "")}`).join(" ");
-        const fullCaption = `${piece.caption}\n\n${piece.cta}\n\n${cleanHashtags}`;
-        const scheduledAt = Math.floor(
-          new Date(`${piece.post_date}T${piece.posting_time}:00-03:00`).getTime() / 1000
-        );
+        const fullCaption = `${piece.caption}
+
+${piece.cta}
+
+${cleanHashtags}`;
+        const scheduledAt = Math.floor(new Date(`${piece.post_date}T${piece.posting_time}:00-03:00`).getTime() / 1000);
         const res = await fetch("/api/push-single-to-buffer", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            profile_id: brand.buffer_profile_id,
-            text: fullCaption,
-            scheduled_at: scheduledAt,
-            image_url: piece.image_url || null,
-            content_type: piece.content_type,
-          }),
+          body: JSON.stringify({ profile_id: brand.buffer_profile_id, text: fullCaption, scheduled_at: scheduledAt, image_url: piece.image_url || null, content_type: piece.content_type }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
@@ -280,8 +338,6 @@ export default function DashboardPage() {
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
         .regen-btn { opacity: 0; transition: opacity 0.2s; }
         .img-wrap:hover .regen-btn { opacity: 1; }
-
-        /* Nav */
         .dash-nav { padding: 14px 20px; border-bottom: 0.5px solid rgba(240,237,230,0.08); }
         .dash-nav-inner { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .nav-logo-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -292,62 +348,37 @@ export default function DashboardPage() {
         .nav-btn-upgrade { background: transparent; color: #C4A882; border: 0.5px solid rgba(196,168,130,0.3); border-radius: 100px; padding: 7px 13px; font-size: 12px; cursor: pointer; font-family: inherit; white-space: nowrap; }
         .nav-btn-generate { background: #F0EDE6; color: #0A0A0A; border: none; border-radius: 100px; padding: 9px 16px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; white-space: nowrap; }
         .nav-btn-generate:disabled { background: #1E1E1C; color: #4A4845; cursor: not-allowed; }
-
-        /* Body */
         .dash-body { max-width: 860px; margin: 0 auto; padding: 20px 16px; }
-
-        /* Post card — desktop row layout */
         .post-card { background: #111111; border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
         .post-card-inner { padding: 16px; }
-
         .post-row { display: flex; align-items: flex-start; gap: 12px; }
-
         .day-col { text-align: center; min-width: 36px; flex-shrink: 0; }
         .day-label { font-size: 9px; color: #4A4845; text-transform: uppercase; letter-spacing: 1px; }
         .day-num { font-family: 'DM Serif Display', serif; font-size: 22px; line-height: 1; }
         .day-month { font-size: 9px; color: #4A4845; text-transform: uppercase; }
         .day-time { font-size: 9px; color: #3A3835; margin-top: 2px; }
-
         .img-thumb { width: 64px; height: 64px; border-radius: 8px; background: #1A1A18; flex-shrink: 0; overflow: hidden; position: relative; }
-
         .content-col { flex: 1; min-width: 0; }
         .content-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; }
         .content-tag { font-size: 9px; color: #6B6760; background: rgba(240,237,230,0.05); padding: 2px 7px; border-radius: 100px; border: 0.5px solid rgba(240,237,230,0.08); text-transform: capitalize; white-space: nowrap; }
         .content-concept { font-size: 10px; color: #4A4845; font-style: italic; margin: 0 0 5px; line-height: 1.4; }
         .content-caption { font-size: 13px; color: #9E9A93; line-height: 1.5; margin: 0 0 5px; cursor: pointer; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-        .content-caption-expanded { font-size: 13px; color: #9E9A93; line-height: 1.5; margin: 0 0 5px; }
         .content-hashtags { font-size: 10px; color: #2A2825; margin: 0; }
-
         .action-col { flex-shrink: 0; width: 100px; }
         .btn-scheduled { width: 100%; background: rgba(34,197,94,0.08); color: #4ADE80; border: 0.5px solid rgba(34,197,94,0.25); border-radius: 8px; padding: 8px 6px; font-size: 10px; font-weight: 500; cursor: pointer; font-family: inherit; text-align: center; line-height: 1.5; }
         .btn-add-image { width: 100%; background: transparent; color: #4A4845; border: 0.5px solid rgba(240,237,230,0.08); border-radius: 8px; padding: 8px 6px; font-size: 10px; cursor: pointer; font-family: inherit; text-align: center; }
         .btn-approve { width: 100%; background: #F0EDE6; color: #0A0A0A; border: none; border-radius: 8px; padding: 8px 6px; font-size: 11px; font-weight: 500; cursor: pointer; font-family: inherit; }
-
-        /* Mobile stacked layout */
         @media (max-width: 600px) {
-          .nav-btn-settings { display: block; }
           .post-row { flex-direction: column; gap: 0; }
-
           .mobile-top-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
           .day-col { text-align: left; min-width: unset; display: flex; align-items: baseline; gap: 5px; }
-          .day-label { font-size: 10px; }
-          .day-num { font-size: 20px; }
-          .day-month { font-size: 10px; }
-          .day-time { font-size: 10px; margin-top: 0; margin-left: 4px; color: #4A4845; }
-
           .img-thumb { width: 100%; height: 180px; border-radius: 10px; margin-bottom: 12px; }
-          .img-thumb button { width: 100%; height: 100%; }
-
           .action-col { width: 100%; margin-top: 12px; }
           .btn-scheduled, .btn-add-image, .btn-approve { padding: 12px; font-size: 13px; border-radius: 10px; }
         }
-
-        @media (min-width: 601px) {
-          .mobile-top-row { display: contents; }
-        }
+        @media (min-width: 601px) { .mobile-top-row { display: contents; } }
       `}</style>
 
-      {/* Nav */}
       <nav className="dash-nav">
         <div className="dash-nav-inner">
           <div className="nav-logo-row">
@@ -364,9 +395,7 @@ export default function DashboardPage() {
           </div>
           <div className="nav-actions">
             <button onClick={() => router.push(`/settings/${brand_id}`)} className="nav-btn-settings">Settings</button>
-            {!isSubscribed && (
-              <button onClick={() => router.push("/upgrade")} className="nav-btn-upgrade">Upgrade</button>
-            )}
+            {!isSubscribed && <button onClick={() => router.push("/upgrade")} className="nav-btn-upgrade">Upgrade</button>}
             <button onClick={generateContent} disabled={generating} className="nav-btn-generate">
               {generating ? "Generating..." : "Generate →"}
             </button>
@@ -386,7 +415,7 @@ export default function DashboardPage() {
             <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "48px", color: "rgba(240,237,230,0.04)", marginBottom: "20px", lineHeight: 1 }}>✦</div>
             <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "24px", color: "#F0EDE6", margin: "0 0 10px" }}>Ready to generate your first week</h2>
             <p style={{ fontSize: "14px", color: "#6B6760", margin: "0 0 6px", lineHeight: 1.6 }}>One click creates 7 days of premium Instagram content for {brand?.brand_name}</p>
-            <p style={{ fontSize: "12px", color: "#4A4845", margin: "0 0 28px" }}>Add an image to each post then approve to schedule in Buffer</p>
+            <p style={{ fontSize: "12px", color: "#4A4845", margin: "0 0 28px" }}>Review images and approve each post to schedule in Buffer</p>
             <button onClick={generateContent} style={{ background: "#F0EDE6", color: "#0A0A0A", border: "none", borderRadius: "100px", padding: "14px 32px", fontSize: "15px", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
               Generate This Week →
             </button>
@@ -412,8 +441,7 @@ export default function DashboardPage() {
                 <div style={{ fontSize: "12px", color: "#6B6760" }}>
                   <span style={{ color: "#C4A882", fontWeight: 500 }}>{approvedCount}</span> of {contentPackage.content_pieces.length}
                 </div>
-                <button
-                  onClick={() => setGridView(!gridView)}
+                <button onClick={() => setGridView(!gridView)}
                   style={{ background: gridView ? "rgba(196,168,130,0.1)" : "transparent", color: gridView ? "#C4A882" : "#6B6760", border: `0.5px solid ${gridView ? "rgba(196,168,130,0.3)" : "rgba(240,237,230,0.1)"}`, borderRadius: "8px", padding: "5px 10px", fontSize: "11px", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
                   {gridView ? "✦ Grid" : "⊞ Grid"}
                 </button>
@@ -455,20 +483,13 @@ export default function DashboardPage() {
               <div key={index} className="post-card" style={{ border: `0.5px solid ${piece.status === "approved" ? "rgba(196,168,130,0.3)" : "rgba(240,237,230,0.06)"}` }}>
                 <div className="post-card-inner">
                   <div className="post-row">
-
-                    {/* Mobile: top row wraps day + image together; desktop: separate columns */}
                     <div className="mobile-top-row">
-                      {/* Day */}
                       <div className="day-col">
                         <div className="day-label">{weekDates[(piece.day - 1) % 7]?.day ?? ""}</div>
-                        <div className="day-num" style={{ color: piece.status === "approved" ? "#C4A882" : "#F0EDE6" }}>
-                          {weekDates[(piece.day - 1) % 7]?.date ?? piece.day}
-                        </div>
+                        <div className="day-num" style={{ color: piece.status === "approved" ? "#C4A882" : "#F0EDE6" }}>{weekDates[(piece.day - 1) % 7]?.date ?? piece.day}</div>
                         <div className="day-month">{weekDates[(piece.day - 1) % 7]?.month ?? ""}</div>
                         <div className="day-time">{piece.posting_time}</div>
                       </div>
-
-                      {/* Image */}
                       <div className="img-thumb img-wrap">
                         {generatingImages.includes(index) ? (
                           <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -477,6 +498,7 @@ export default function DashboardPage() {
                         ) : piece.image_url ? (
                           <>
                             <img src={piece.image_url} alt={piece.concept} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            <ImageSourceBadge source={piece.image_source} />
                             <div className="regen-btn" style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} onClick={() => generateImage(index)}>
                               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F0EDE6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
@@ -495,27 +517,19 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    {/* Content */}
                     <div className="content-col">
                       <div className="content-tags">
                         <span className="content-tag">{piece.content_type.replace("_", " ")}</span>
                         <span className="content-tag">{piece.content_pillar}</span>
                       </div>
                       <p className="content-concept">{piece.concept}</p>
-
                       {selectedPiece === index ? (
                         <div>
-                          <textarea
-                            value={editingCaption}
-                            onChange={(e) => setEditingCaption(e.target.value)}
-                            rows={5}
-                            style={{ width: "100%", background: "#0A0A0A", border: "0.5px solid rgba(240,237,230,0.15)", borderRadius: "8px", padding: "10px 12px", fontSize: "13px", color: "#F0EDE6", outline: "none", resize: "none", fontFamily: "inherit", boxSizing: "border-box" }}
-                          />
+                          <textarea value={editingCaption} onChange={(e) => setEditingCaption(e.target.value)} rows={5}
+                            style={{ width: "100%", background: "#0A0A0A", border: "0.5px solid rgba(240,237,230,0.15)", borderRadius: "8px", padding: "10px 12px", fontSize: "13px", color: "#F0EDE6", outline: "none", resize: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
                           <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
                             <button onClick={() => saveCaption(index)} style={{ fontSize: "12px", background: "#F0EDE6", color: "#0A0A0A", border: "none", borderRadius: "100px", padding: "7px 16px", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>Save</button>
-                            <button
-                              onClick={() => regenerateCaption(index)}
-                              disabled={regeneratingCaptions.includes(index)}
+                            <button onClick={() => regenerateCaption(index)} disabled={regeneratingCaptions.includes(index)}
                               style={{ fontSize: "12px", background: "transparent", color: "#C4A882", border: "0.5px solid rgba(196,168,130,0.3)", borderRadius: "100px", padding: "7px 16px", cursor: regeneratingCaptions.includes(index) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: regeneratingCaptions.includes(index) ? 0.5 : 1 }}>
                               {regeneratingCaptions.includes(index) ? "Rewriting..." : "Regenerate"}
                             </button>
@@ -523,18 +537,14 @@ export default function DashboardPage() {
                           </div>
                         </div>
                       ) : (
-                        <p className="content-caption" onClick={() => { setSelectedPiece(index); setEditingCaption(piece.caption); }}>
-                          {piece.caption}
-                        </p>
+                        <p className="content-caption" onClick={() => { setSelectedPiece(index); setEditingCaption(piece.caption); }}>{piece.caption}</p>
                       )}
-
                       <p className="content-hashtags">
                         {piece.hashtags.slice(0, 3).map((h) => `#${h.replace(/#/g, "")}`).join(" ")}
                         {piece.hashtags.length > 3 && ` +${piece.hashtags.length - 3}`}
                       </p>
                     </div>
 
-                    {/* Action */}
                     <div className="action-col">
                       {piece.status === "approved" ? (
                         <button onClick={() => toggleApprove(index)} disabled={approvingIndex === index} className="btn-scheduled">
@@ -551,7 +561,6 @@ export default function DashboardPage() {
                         </button>
                       )}
                     </div>
-
                   </div>
                 </div>
               </div>

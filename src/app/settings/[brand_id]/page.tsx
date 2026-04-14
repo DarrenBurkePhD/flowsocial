@@ -41,6 +41,15 @@ const FINISH_OPTIONS = [
   { id: "natural_organic", label: "Natural and organic", desc: "Earthy, wholesome, real" },
 ];
 
+type BrandAsset = {
+  id: string;
+  public_url: string;
+  storage_path: string;
+  asset_type: string;
+  label?: string;
+  created_at: string;
+};
+
 type Brand = {
   id: string;
   brand_name: string;
@@ -78,6 +87,12 @@ export default function SettingsPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoUrl, setLogoUrl] = useState("");
 
+  const [assets, setAssets] = useState<BrandAsset[]>([]);
+  const [loadingAssets, setLoadingAssets] = useState(false);
+  const [uploadingAssets, setUploadingAssets] = useState(false);
+  const [deletingAssetId, setDeletingAssetId] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+
   const [form, setForm] = useState({
     brand_name: "",
     brand_description: "",
@@ -95,6 +110,12 @@ export default function SettingsPage() {
   useEffect(() => {
     loadBrand();
   }, [brand_id]);
+
+  useEffect(() => {
+    if (activeTab === "assets" && assets.length === 0 && !loadingAssets) {
+      loadAssets();
+    }
+  }, [activeTab]);
 
   async function loadBrand() {
     try {
@@ -124,6 +145,71 @@ export default function SettingsPage() {
     }
   }
 
+  async function loadAssets() {
+    setLoadingAssets(true);
+    try {
+      const res = await fetch(`/api/get-brand-assets?brand_id=${brand_id}`);
+      const data = await res.json();
+      if (data.assets) setAssets(data.assets);
+    } catch {
+      showMessage("Failed to load assets", "error");
+    } finally {
+      setLoadingAssets(false);
+    }
+  }
+
+  async function handleAssetUpload(files: FileList | File[]) {
+    const validFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (!validFiles.length) return;
+    setUploadingAssets(true);
+    try {
+      const supabase = createClient();
+      const newAssets: BrandAsset[] = [];
+      for (const file of validFiles) {
+        const ext = file.name.split(".").pop();
+        const fileName = `brand_assets/${brand_id}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from("media")
+          .upload(fileName, file, { upsert: false });
+        if (uploadError) { console.error("Upload error:", uploadError); continue; }
+        const { data: urlData } = supabase.storage.from("media").getPublicUrl(fileName);
+        const res = await fetch("/api/save-brand-asset", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ brand_id, public_url: urlData.publicUrl, storage_path: fileName, asset_type: "photo" }),
+        });
+        if (res.ok) {
+          const { asset } = await res.json();
+          newAssets.push(asset);
+        }
+      }
+      setAssets((prev) => [...newAssets, ...prev]);
+      if (newAssets.length > 0) showMessage(`${newAssets.length} image${newAssets.length > 1 ? "s" : ""} uploaded`, "success");
+    } catch {
+      showMessage("Upload failed", "error");
+    } finally {
+      setUploadingAssets(false);
+    }
+  }
+
+  async function handleDeleteAsset(asset: BrandAsset) {
+    setDeletingAssetId(asset.id);
+    try {
+      const supabase = createClient();
+      await supabase.storage.from("media").remove([asset.storage_path]);
+      const res = await fetch("/api/delete-brand-asset", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ asset_id: asset.id }),
+      });
+      if (res.ok) setAssets((prev) => prev.filter((a) => a.id !== asset.id));
+    } catch {
+      showMessage("Failed to remove image", "error");
+    } finally {
+      setDeletingAssetId(null);
+    }
+  }
+
   function updateField(field: string, value: unknown) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
@@ -131,10 +217,7 @@ export default function SettingsPage() {
   function toggleArrayItem(field: "brand_voice" | "psychographics", item: string) {
     setForm((prev) => {
       const arr = prev[field];
-      return {
-        ...prev,
-        [field]: arr.includes(item) ? arr.filter((i) => i !== item) : [...arr, item],
-      };
+      return { ...prev, [field]: arr.includes(item) ? arr.filter((i) => i !== item) : [...arr, item] };
     });
   }
 
@@ -221,8 +304,6 @@ export default function SettingsPage() {
 
   return (
     <main style={{ minHeight: "100vh", background: "#0A0A0A", color: "#F0EDE6", fontFamily: "'DM Sans', sans-serif" }}>
-
-      {/* Nav */}
       <nav style={{ borderBottom: "0.5px solid rgba(240,237,230,0.08)", padding: "20px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
@@ -249,7 +330,6 @@ export default function SettingsPage() {
       </nav>
 
       <div style={{ maxWidth: "720px", margin: "0 auto", padding: "40px 24px" }}>
-
         {message && (
           <div style={{ marginBottom: "24px", padding: "12px 16px", borderRadius: "8px", fontSize: "13px", background: messageType === "success" ? "rgba(196,168,130,0.1)" : "rgba(220,38,38,0.1)", border: `0.5px solid ${messageType === "success" ? "rgba(196,168,130,0.3)" : "rgba(220,38,38,0.3)"}`, color: messageType === "success" ? "#C4A882" : "#FCA5A5" }}>
             {message}
@@ -261,7 +341,6 @@ export default function SettingsPage() {
           <p style={{ fontSize: "14px", color: "#6B6760", margin: 0 }}>Update your brand profile, image style, and assets. Changes apply to all future content generations.</p>
         </div>
 
-        {/* Tabs */}
         <div style={{ display: "flex", gap: "6px", marginBottom: "32px", background: "#111111", padding: "6px", borderRadius: "10px", border: "0.5px solid rgba(240,237,230,0.06)" }}>
           {(["brand", "audience", "images", "assets"] as const).map((tab) => (
             <button key={tab} onClick={() => setActiveTab(tab)} style={activeTab === tab ? tabActive : tabInactive}>
@@ -270,7 +349,6 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        {/* Brand tab */}
         {activeTab === "brand" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             <div style={{ background: "#111111", border: "0.5px solid rgba(240,237,230,0.06)", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -293,7 +371,6 @@ export default function SettingsPage() {
                 <p style={{ fontSize: "11px", color: "#4A4845", marginTop: "4px" }}>Find this in your Buffer URL: buffer.com/channels/YOUR-ID/schedule</p>
               </div>
             </div>
-
             <div style={{ background: "#111111", border: "0.5px solid rgba(240,237,230,0.06)", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", gap: "12px" }}>
               <h3 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "18px", color: "#F0EDE6", margin: 0 }}>Brand voice</h3>
               <p style={{ fontSize: "13px", color: "#6B6760", margin: 0 }}>Pick up to 3 tones that shape how your captions are written.</p>
@@ -306,7 +383,6 @@ export default function SettingsPage() {
                 ))}
               </div>
             </div>
-
             <div style={{ background: "rgba(196,168,130,0.06)", border: "0.5px solid rgba(196,168,130,0.2)", borderRadius: "12px", padding: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
               <div>
                 <div style={{ fontSize: "14px", fontWeight: 500, color: "#C4A882", marginBottom: "4px" }}>Regenerate brand DNA</div>
@@ -320,7 +396,6 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Audience tab */}
         {activeTab === "audience" && (
           <div style={{ background: "#111111", border: "0.5px solid rgba(240,237,230,0.06)", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
             <h3 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "18px", color: "#F0EDE6", margin: 0 }}>Target audience</h3>
@@ -350,7 +425,6 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Images tab */}
         {activeTab === "images" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <div style={{ background: "#111111", border: "0.5px solid rgba(240,237,230,0.06)", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -374,12 +448,11 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Assets tab */}
         {activeTab === "assets" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <div style={{ background: "#111111", border: "0.5px solid rgba(240,237,230,0.06)", borderRadius: "12px", padding: "24px" }}>
               <h3 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "18px", color: "#F0EDE6", margin: "0 0 8px" }}>Brand logo</h3>
-              <p style={{ fontSize: "13px", color: "#6B6760", margin: "0 0 20px", lineHeight: 1.6 }}>Upload your logo to use as a reference for image generation and future brand features.</p>
+              <p style={{ fontSize: "13px", color: "#6B6760", margin: "0 0 20px", lineHeight: 1.6 }}>Your logo is used as a reference across future brand features.</p>
               {logoUrl && (
                 <div style={{ marginBottom: "16px", width: "80px", height: "80px", borderRadius: "8px", overflow: "hidden", background: "#1A1A18" }}>
                   <img src={logoUrl} alt="Brand logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
@@ -392,8 +465,56 @@ export default function SettingsPage() {
             </div>
 
             <div style={{ background: "#111111", border: "0.5px solid rgba(240,237,230,0.06)", borderRadius: "12px", padding: "24px" }}>
-              <h3 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "18px", color: "#F0EDE6", margin: "0 0 8px" }}>Coming soon</h3>
-              <p style={{ fontSize: "13px", color: "#4A4845", margin: 0, lineHeight: 1.6 }}>Product image uploads and brand guidelines PDF upload are coming in the next update. These will be used directly in image generation to make your content even more on-brand.</p>
+              <h3 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "18px", color: "#F0EDE6", margin: "0 0 6px" }}>Brand image library</h3>
+              <p style={{ fontSize: "13px", color: "#6B6760", margin: "0 0 20px", lineHeight: 1.6 }}>
+                Upload your product shots and lifestyle photos. When you generate content, your images will make up roughly 60% of the week — the rest is filled with curated stock photography matching your brand aesthetic.
+              </p>
+              <div
+                onClick={() => document.getElementById("asset-file-input")?.click()}
+                onDrop={(e) => { e.preventDefault(); setDragOver(false); handleAssetUpload(e.dataTransfer.files); }}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                style={{ border: `1.5px dashed ${dragOver ? "#C4A882" : "rgba(240,237,230,0.12)"}`, borderRadius: "10px", padding: "28px 16px", textAlign: "center", cursor: "pointer", transition: "all 0.15s", background: dragOver ? "rgba(196,168,130,0.04)" : "transparent", marginBottom: "20px" }}>
+                <input id="asset-file-input" type="file" accept="image/*" multiple style={{ display: "none" }} onChange={(e) => e.target.files && handleAssetUpload(e.target.files)} />
+                {uploadingAssets ? (
+                  <div style={{ color: "#C4A882", fontSize: "13px" }}>Uploading...</div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: "22px", marginBottom: "8px", color: "#3A3835" }}>+</div>
+                    <div style={{ color: "#9E9A93", fontSize: "13px", marginBottom: "4px" }}>Drop images here or tap to upload</div>
+                    <div style={{ color: "#4A4845", fontSize: "11px" }}>JPG, PNG, WEBP — multiple files at once</div>
+                  </>
+                )}
+              </div>
+              {loadingAssets ? (
+                <div style={{ textAlign: "center", padding: "24px", color: "#4A4845", fontSize: "13px" }}>Loading...</div>
+              ) : assets.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "20px", color: "#3A3835", fontSize: "13px" }}>
+                  No images uploaded yet. Your feed will use curated stock photos until you add your own.
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: "11px", color: "#6B6760", marginBottom: "12px" }}>
+                    {assets.length} image{assets.length !== 1 ? "s" : ""} in your library
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: "8px" }}>
+                    {assets.map((asset) => (
+                      <div key={asset.id}
+                        style={{ position: "relative", aspectRatio: "1", borderRadius: "8px", overflow: "hidden", background: "#1A1A18" }}
+                        onMouseEnter={(e) => { const o = e.currentTarget.querySelector(".asset-del") as HTMLElement; if (o) o.style.opacity = "1"; }}
+                        onMouseLeave={(e) => { const o = e.currentTarget.querySelector(".asset-del") as HTMLElement; if (o) o.style.opacity = "0"; }}>
+                        <img src={asset.public_url} alt="Brand asset" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        <div className="asset-del" style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s" }}>
+                          <button onClick={() => handleDeleteAsset(asset)} disabled={deletingAssetId === asset.id}
+                            style={{ background: "rgba(220,38,38,0.85)", color: "#fff", border: "none", borderRadius: "6px", padding: "5px 10px", fontSize: "11px", cursor: "pointer", fontFamily: "inherit" }}>
+                            {deletingAssetId === asset.id ? "..." : "Remove"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -404,7 +525,6 @@ export default function SettingsPage() {
             {saving ? "Saving..." : "Save changes"}
           </button>
         </div>
-
       </div>
     </main>
   );
