@@ -56,7 +56,7 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-async function fetchUnsplashImages(brandDna: Brand["brand_dna"], count: number): Promise<{ url: string; source: "unsplash" }[]> {
+async function fetchPexelsImages(brandDna: Brand["brand_dna"], count: number): Promise<{ url: string; source: "unsplash" }[]> {
   const parts: string[] = [];
   if (brandDna?.aesthetic_direction) parts.push(brandDna.aesthetic_direction.split(" ").slice(0, 3).join(" "));
   if (brandDna?.content_pillars?.length) parts.push(brandDna.content_pillars[0]);
@@ -77,7 +77,7 @@ async function assignImages(pieces: ContentPiece[], brandAssets: BrandAsset[], b
   const hasBrandAssets = brandAssets.length > 0;
   const brandCount = hasBrandAssets ? Math.round(count * 0.6) : 0;
   const unsplashCount = count - brandCount;
-  const unsplashPool = await fetchUnsplashImages(brandDna, unsplashCount);
+  const unsplashPool = await fetchPexelsImages(brandDna, unsplashCount);
   const brandPool = shuffle([...brandAssets]).slice(0, brandCount).map((a) => ({ url: a.public_url, source: "brand" as const }));
   const unsplashSlots = shuffle([...unsplashPool]).slice(0, unsplashCount);
   const allSlots: { url: string; source: "brand" | "unsplash" }[] = shuffle([...brandPool, ...unsplashSlots]);
@@ -107,6 +107,32 @@ function getWeekDates(startDate: string) {
 function formatScheduledTime(post_date: string, posting_time: string) {
   const date = new Date(`${post_date}T${posting_time}:00`);
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " at " + date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+}
+
+function getThisWeekMonday(): string {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diff);
+  return monday.toISOString().split("T")[0];
+}
+
+function getNextMondayLabel(): string {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? 1 : 8 - day;
+  const next = new Date(now);
+  next.setDate(now.getDate() + diff);
+  return next.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function isThisWeeksPackage(weekStartDate: string): boolean {
+  const monday = getThisWeekMonday();
+  const pkgDate = new Date(weekStartDate);
+  const monDate = new Date(monday);
+  const diffDays = Math.abs((pkgDate.getTime() - monDate.getTime()) / (1000 * 60 * 60 * 24));
+  return diffDays < 7;
 }
 
 function ImageSourceBadge({ source }: { source?: "brand" | "unsplash" | "ai" | null }) {
@@ -331,6 +357,8 @@ ${cleanHashtags}`;
 
   const approvedCount = contentPackage?.content_pieces.filter((p) => p.status === "approved").length ?? 0;
   const weekDates = contentPackage ? getWeekDates(contentPackage.week_start_date) : [];
+  const weekLocked = contentPackage ? isThisWeeksPackage(contentPackage.week_start_date) : false;
+  const nextMonday = getNextMondayLabel();
 
   return (
     <main style={{ minHeight: "100vh", background: "#0A0A0A", color: "#F0EDE6", fontFamily: "'DM Sans', sans-serif" }}>
@@ -348,6 +376,7 @@ ${cleanHashtags}`;
         .nav-btn-upgrade { background: transparent; color: #C4A882; border: 0.5px solid rgba(196,168,130,0.3); border-radius: 100px; padding: 7px 13px; font-size: 12px; cursor: pointer; font-family: inherit; white-space: nowrap; }
         .nav-btn-generate { background: #F0EDE6; color: #0A0A0A; border: none; border-radius: 100px; padding: 9px 16px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; white-space: nowrap; }
         .nav-btn-generate:disabled { background: #1E1E1C; color: #4A4845; cursor: not-allowed; }
+        .nav-btn-generated { background: transparent; color: #4A4845; border: 0.5px solid rgba(240,237,230,0.08); border-radius: 100px; padding: 9px 16px; font-size: 12px; font-family: inherit; white-space: nowrap; cursor: default; }
         .dash-body { max-width: 860px; margin: 0 auto; padding: 20px 16px; }
         .post-card { background: #111111; border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
         .post-card-inner { padding: 16px; }
@@ -396,9 +425,16 @@ ${cleanHashtags}`;
           <div className="nav-actions">
             <button onClick={() => router.push(`/settings/${brand_id}`)} className="nav-btn-settings">Settings</button>
             {!isSubscribed && <button onClick={() => router.push("/upgrade")} className="nav-btn-upgrade">Upgrade</button>}
-            <button onClick={generateContent} disabled={generating} className="nav-btn-generate">
-              {generating ? "Generating..." : "Generate →"}
-            </button>
+            {weekLocked ? (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
+                <button className="nav-btn-generated" disabled>✓ Generated</button>
+                <span style={{ fontSize: "9px", color: "#3A3835", whiteSpace: "nowrap" }}>Next week unlocks {nextMonday}</span>
+              </div>
+            ) : (
+              <button onClick={generateContent} disabled={generating} className="nav-btn-generate">
+                {generating ? "Generating..." : "Generate →"}
+              </button>
+            )}
           </div>
         </div>
       </nav>
@@ -565,6 +601,17 @@ ${cleanHashtags}`;
                 </div>
               </div>
             ))}
+
+            {weekLocked && (
+              <div style={{ textAlign: "center", paddingTop: "24px", paddingBottom: "8px" }}>
+                <button
+                  onClick={generateContent}
+                  disabled={generating}
+                  style={{ background: "none", border: "none", color: "#3A3835", fontSize: "12px", cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>
+                  Start fresh with a new week
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
