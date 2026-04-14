@@ -39,6 +39,18 @@ export async function POST(request: NextRequest) {
     const dueAt = toHalifaxUTC(post_date, posting_time);
     console.log("Scheduling to Buffer:", { profile_id, dueAt });
 
+    const input: Record<string, unknown> = {
+      channelId: profile_id,
+      text: caption,
+      schedulingType: "automatic",
+      mode: "customScheduled",
+      dueAt,
+    };
+
+    if (image_url) {
+      input.assets = { images: [{ url: image_url }] };
+    }
+
     const mutation = `
       mutation CreatePost($input: CreatePostInput!) {
         createPost(input: $input) {
@@ -55,46 +67,16 @@ export async function POST(request: NextRequest) {
       }
     `;
 
-    const variables = {
-      input: {
-        channelId: profile_id,
-        text: caption,
-        schedulingType: "automatic",
-        mode: "customScheduled",
-        dueAt,
-        ...(image_url ? { assets: [{ url: image_url, type: "image" }] } : {}),
+    const response = await fetch("https://api.buffer.com/graphql", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.BUFFER_ACCESS_TOKEN}`,
       },
-    };
+      body: JSON.stringify({ query: mutation, variables: { input } }),
+    });
 
-    const requestBody = JSON.stringify({ query: mutation, variables });
-    console.log("Sending to Buffer:", requestBody.substring(0, 500));
-
-    let response: Response;
-    try {
-      response = await fetch("https://api.buffer.com/graphql", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.BUFFER_ACCESS_TOKEN}`,
-        },
-        body: requestBody,
-      });
-    } catch (fetchErr) {
-      console.error("Fetch to Buffer failed:", fetchErr);
-      return NextResponse.json({ error: "Could not reach Buffer API", details: String(fetchErr) }, { status: 500 });
-    }
-
-    console.log("Buffer HTTP status:", response.status);
-
-    let data: Record<string, unknown>;
-    try {
-      data = await response.json();
-    } catch (parseErr) {
-      const text = await response.text().catch(() => "unreadable");
-      console.error("Buffer response not JSON. Status:", response.status, "Body:", text);
-      return NextResponse.json({ error: "Buffer returned non-JSON", status: response.status, body: text }, { status: 500 });
-    }
-
+    const data = await response.json();
     console.log("Buffer response:", JSON.stringify(data));
 
     if (data.errors) {
@@ -102,20 +84,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Buffer API error", details: data.errors }, { status: 500 });
     }
 
-    const result = data.data as { createPost?: { post?: { id: string; dueAt: string }; message?: string } };
-    const createPost = result?.createPost;
+    const result = data.data?.createPost;
 
-    if (createPost?.message) {
-      console.error("Buffer mutation error:", createPost.message);
-      return NextResponse.json({ error: createPost.message }, { status: 500 });
+    if (result?.message) {
+      console.error("Buffer mutation error:", result.message);
+      return NextResponse.json({ error: result.message }, { status: 500 });
     }
 
-    const post = createPost?.post;
-    console.log("Post scheduled successfully:", post);
+    const post = result?.post;
+    console.log("Scheduled successfully:", post);
     return NextResponse.json({ success: true, buffer_id: post?.id, dueAt });
 
   } catch (error) {
-    console.error("push-single-to-buffer unexpected error:", error);
+    console.error("push-single-to-buffer error:", error);
     return NextResponse.json({ error: "Internal server error", details: String(error) }, { status: 500 });
   }
 }
