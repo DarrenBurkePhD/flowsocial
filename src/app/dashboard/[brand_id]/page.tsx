@@ -233,15 +233,18 @@ export default function DashboardPage() {
       try {
         const cleanHashtags = piece.hashtags.map((h) => `#${h.replace(/#/g, "")}`).join(" ");
         const fullCaption = `${piece.caption}\n\n${piece.cta}\n\n${cleanHashtags}`;
+        const scheduledAt = Math.floor(
+          new Date(`${piece.post_date}T${piece.posting_time}:00-03:00`).getTime() / 1000
+        );
         const res = await fetch("/api/push-single-to-buffer", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             profile_id: brand.buffer_profile_id,
-            caption: fullCaption,
-            post_date: piece.post_date,
-            posting_time: piece.posting_time,
+            text: fullCaption,
+            scheduled_at: scheduledAt,
             image_url: piece.image_url || null,
+            content_type: piece.content_type,
           }),
         });
         const data = await res.json();

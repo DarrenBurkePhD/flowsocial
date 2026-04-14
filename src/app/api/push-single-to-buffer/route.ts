@@ -1,59 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 
-function nthSundayOfMonth(year: number, month: number, n: number): Date {
-  const d = new Date(Date.UTC(year, month, 1));
-  const firstSunday = (7 - d.getUTCDay()) % 7;
-  return new Date(Date.UTC(year, month, 1 + firstSunday + (n - 1) * 7));
-}
-
-function getHalifaxOffset(dateStr: string): string {
-  const d = new Date(`${dateStr}T12:00:00Z`);
-  const year = d.getUTCFullYear();
-  const dstStart = nthSundayOfMonth(year, 2, 2);
-  const dstEnd = nthSundayOfMonth(year, 10, 1);
-  return d >= dstStart && d < dstEnd ? "-03:00" : "-04:00";
-}
-
-function toHalifaxUTC(dateStr: string, timeStr: string): string {
-  const offset = getHalifaxOffset(dateStr);
-  const time = timeStr.length === 5 ? `${timeStr}:00` : timeStr;
-  return new Date(`${dateStr}T${time}${offset}`).toISOString();
-}
-
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { profile_id, text, scheduled_at, image_url, content_type } = await req.json();
+
+    if (!image_url) {
+      return NextResponse.json(
+        { error: "Instagram requires an image. Please add an image before approving." },
+        { status: 400 }
+      );
     }
 
-    const body = await request.json();
-    const { profile_id, caption, image_url, post_date, posting_time } = body;
+    const dueAt = new Date(scheduled_at * 1000).toISOString();
+    const instagramType = content_type === "story" ? "story" : "post";
 
-    if (!profile_id || !caption || !post_date || !posting_time) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
-
-    const dueAt = toHalifaxUTC(post_date, posting_time);
-
-    const imageAssets = image_url
-      ? `assets: { images: [{ url: "${image_url}" }] }`
-      : "";
-
-    const query = `
-      mutation {
+    const mutation = `
+      mutation CreatePost {
         createPost(input: {
           channelId: "${profile_id}",
-          text: ${JSON.stringify(caption)},
+          text: ${JSON.stringify(text)},
           schedulingType: automatic,
           mode: customScheduled,
-          dueAt: "${dueAt}"
-          ${imageAssets}
+          dueAt: "${dueAt}",
+          assets: {
+            images: [
+              { url: ${JSON.stringify(image_url)} }
+            ]
+          },
+          metadata: {
+            instagram: {
+              type: ${instagramType},
+              shouldShareToFeed: true
+            }
+          }
         }) {
           ... on PostActionSuccess {
-            post { id dueAt }
+            post {
+              id
+              dueAt
+            }
           }
           ... on MutationError {
             message
@@ -62,51 +47,40 @@ export async function POST(request: NextRequest) {
       }
     `;
 
-    const response = await fetch("https://api.buffer.com/graphql", {
+    const bufferRes = await fetch("https://api.buffer.com", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${process.env.BUFFER_ACCESS_TOKEN}`,
       },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query: mutation }),
     });
 
-    const httpStatus = response.status;
-    const text = await response.text();
+    const bufferData = await bufferRes.json();
 
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      // Return raw response so we can see what Buffer said
-      return NextResponse.json({
-        error: "Buffer returned non-JSON",
-        httpStatus,
-        body: text
-      }, { status: 500 });
+    if (bufferData.errors) {
+      return NextResponse.json(
+        { error: bufferData.errors[0].message },
+        { status: 400 }
+      );
     }
 
-    if (data.errors) {
-      return NextResponse.json({
-        error: "Buffer GraphQL error",
-        httpStatus,
-        details: data.errors
-      }, { status: 500 });
-    }
-
-    const result = data.data?.createPost;
+    const result = bufferData.data?.createPost;
     if (result?.message) {
-      return NextResponse.json({
-        error: result.message,
-        httpStatus,
-        raw: data
-      }, { status: 500 });
+      return NextResponse.json({ error: result.message }, { status: 400 });
     }
 
-    const post = result?.post;
-    return NextResponse.json({ success: true, buffer_id: post?.id, dueAt });
+    return NextResponse.json({
+      success: true,
+      buffer_id: result?.post?.id,
+      scheduled_at: result?.post?.dueAt,
+    });
 
-  } catch (error) {
-    return NextResponse.json({ error: "Internal server error", details: String(error) }, { status: 500 });
+  } catch (err: unknown) {
+    console.error("Buffer push error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Buffer push failed" },
+      { status: 500 }
+    );
   }
 }
