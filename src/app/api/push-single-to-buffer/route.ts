@@ -66,35 +66,56 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    const response = await fetch("https://api.buffer.com/graphql", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.BUFFER_ACCESS_TOKEN}`,
-      },
-      body: JSON.stringify({ query: mutation, variables }),
-    });
+    const requestBody = JSON.stringify({ query: mutation, variables });
+    console.log("Sending to Buffer:", requestBody.substring(0, 500));
 
-    const data = await response.json();
+    let response: Response;
+    try {
+      response = await fetch("https://api.buffer.com/graphql", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.BUFFER_ACCESS_TOKEN}`,
+        },
+        body: requestBody,
+      });
+    } catch (fetchErr) {
+      console.error("Fetch to Buffer failed:", fetchErr);
+      return NextResponse.json({ error: "Could not reach Buffer API", details: String(fetchErr) }, { status: 500 });
+    }
+
+    console.log("Buffer HTTP status:", response.status);
+
+    let data: Record<string, unknown>;
+    try {
+      data = await response.json();
+    } catch (parseErr) {
+      const text = await response.text().catch(() => "unreadable");
+      console.error("Buffer response not JSON. Status:", response.status, "Body:", text);
+      return NextResponse.json({ error: "Buffer returned non-JSON", status: response.status, body: text }, { status: 500 });
+    }
+
     console.log("Buffer response:", JSON.stringify(data));
 
     if (data.errors) {
-      console.error("Buffer GraphQL errors:", data.errors);
+      console.error("Buffer GraphQL errors:", JSON.stringify(data.errors));
       return NextResponse.json({ error: "Buffer API error", details: data.errors }, { status: 500 });
     }
 
-    const result = data.data?.createPost;
+    const result = data.data as { createPost?: { post?: { id: string; dueAt: string }; message?: string } };
+    const createPost = result?.createPost;
 
-    if (result?.message) {
-      console.error("Buffer mutation error:", result.message);
-      return NextResponse.json({ error: result.message }, { status: 500 });
+    if (createPost?.message) {
+      console.error("Buffer mutation error:", createPost.message);
+      return NextResponse.json({ error: createPost.message }, { status: 500 });
     }
 
-    const post = result?.post;
+    const post = createPost?.post;
+    console.log("Post scheduled successfully:", post);
     return NextResponse.json({ success: true, buffer_id: post?.id, dueAt });
 
   } catch (error) {
-    console.error("push-single-to-buffer error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("push-single-to-buffer unexpected error:", error);
+    return NextResponse.json({ error: "Internal server error", details: String(error) }, { status: 500 });
   }
 }
