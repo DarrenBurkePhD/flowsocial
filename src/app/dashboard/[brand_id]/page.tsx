@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 type ContentPiece = {
   day: number;
@@ -72,20 +73,30 @@ export default function DashboardPage() {
   const [generating, setGenerating] = useState(false);
   const [generatingImages, setGeneratingImages] = useState<number[]>([]);
   const [approvingIndex, setApprovingIndex] = useState<number | null>(null);
-  const [hoveredImage, setHoveredImage] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [selectedPiece, setSelectedPiece] = useState<number | null>(null);
   const [editingCaption, setEditingCaption] = useState("");
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   useEffect(() => {
     fetchBrand();
     fetchLatestPackage();
+    checkSubscription();
+    if (brand_id) localStorage.setItem("last_brand_id", brand_id);
   }, [brand_id]);
 
-  useEffect(() => {
-  localStorage.setItem("last_brand_id", brand_id);
-}, [brand_id]);
+  async function checkSubscription() {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from("subscriptions")
+      .select("status")
+      .eq("user_id", user.id)
+      .single();
+    if (data?.status === "active") setIsSubscribed(true);
+  }
 
   async function fetchBrand() {
     const res = await fetch(`/api/get-brand?brand_id=${brand_id}`);
@@ -168,14 +179,11 @@ export default function DashboardPage() {
 
   async function toggleApprove(index: number) {
     if (!contentPackage || approvingIndex === index) return;
-
     const piece = contentPackage.content_pieces[index];
-
     if (piece.status !== "approved" && !piece.image_url) {
       showMessage("Add an image first — Instagram requires one.", "error");
       return;
     }
-
     setApprovingIndex(index);
     const updated = [...contentPackage.content_pieces];
     const newStatus = updated[index].status === "approved" ? "pending" : "approved";
@@ -194,7 +202,6 @@ export default function DashboardPage() {
         const fullCaption = `${piece.caption}\n\n${piece.cta}\n\n${cleanHashtags}`;
         const scheduledAt = new Date(`${piece.post_date}T${piece.posting_time}:00`);
         const scheduledTimestamp = Math.floor(scheduledAt.getTime() / 1000);
-
         const res = await fetch("/api/push-single-to-buffer", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -206,10 +213,8 @@ export default function DashboardPage() {
             content_type: piece.content_type,
           }),
         });
-
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
-
         updated[index] = { ...updated[index], buffer_id: data.buffer_id };
         setContentPackage({ ...contentPackage, content_pieces: updated });
         await persistPieces(contentPackage.id, updated);
@@ -220,7 +225,6 @@ export default function DashboardPage() {
     } else {
       showMessage("Post removed from schedule.", "success");
     }
-
     setApprovingIndex(null);
   }
 
@@ -243,91 +247,137 @@ export default function DashboardPage() {
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
         .regen-btn { opacity: 0; transition: opacity 0.2s; }
         .img-wrap:hover .regen-btn { opacity: 1; }
+
+        .dash-nav { padding: 16px 20px; }
+        .dash-nav-inner { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .nav-logo-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .nav-logo-text { font-family: 'DM Serif Display', serif; font-size: 18px; color: #F0EDE6; line-height: 1; }
+        .nav-brand-name { font-size: 12px; color: #6B6760; margin-top: 2px; }
+        .nav-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .nav-btn-settings { background: transparent; color: #6B6760; border: 0.5px solid rgba(240,237,230,0.1); border-radius: 100px; padding: 8px 14px; font-size: 12px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+        .nav-btn-upgrade { background: transparent; color: #C4A882; border: 0.5px solid rgba(196,168,130,0.3); border-radius: 100px; padding: 8px 14px; font-size: 12px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+        .nav-btn-generate { background: #F0EDE6; color: #0A0A0A; border: none; border-radius: 100px; padding: 10px 18px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; white-space: nowrap; }
+        .nav-btn-generate:disabled { background: #1E1E1C; color: #4A4845; cursor: not-allowed; }
+
+        .dash-body { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
+
+        .post-card { background: #111111; border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
+        .post-card-inner { padding: 16px; }
+        .post-row { display: flex; align-items: flex-start; gap: 12px; }
+
+        .day-col { text-align: center; min-width: 36px; flex-shrink: 0; }
+        .day-label { font-size: 9px; color: #4A4845; text-transform: uppercase; letter-spacing: 1px; }
+        .day-num { font-family: 'DM Serif Display', serif; font-size: 22px; line-height: 1; }
+        .day-month { font-size: 9px; color: #4A4845; text-transform: uppercase; }
+        .day-time { font-size: 9px; color: #3A3835; margin-top: 2px; }
+
+        .img-col { width: 64px; height: 64px; border-radius: 8px; background: #1A1A18; flex-shrink: 0; overflow: hidden; position: relative; }
+
+        .content-col { flex: 1; min-width: 0; }
+        .content-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 5px; }
+        .content-tag { font-size: 9px; color: #6B6760; background: rgba(240,237,230,0.05); padding: 2px 7px; border-radius: 100px; border: 0.5px solid rgba(240,237,230,0.08); text-transform: capitalize; white-space: nowrap; }
+        .content-concept { font-size: 10px; color: #4A4845; font-style: italic; margin: 0 0 5px; line-height: 1.4; }
+        .content-caption { font-size: 13px; color: #9E9A93; line-height: 1.5; margin: 0 0 5px; cursor: pointer; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .content-hashtags { font-size: 10px; color: #2A2825; margin: 0; }
+
+        .action-col { flex-shrink: 0; width: 100px; }
+        .btn-scheduled { width: 100%; background: rgba(34,197,94,0.08); color: #4ADE80; border: 0.5px solid rgba(34,197,94,0.25); border-radius: 8px; padding: 8px 6px; font-size: 10px; font-weight: 500; cursor: pointer; font-family: inherit; text-align: center; line-height: 1.5; }
+        .btn-add-image { width: 100%; background: transparent; color: #4A4845; border: 0.5px solid rgba(240,237,230,0.08); border-radius: 8px; padding: 8px 6px; font-size: 10px; cursor: pointer; font-family: inherit; text-align: center; }
+        .btn-approve { width: 100%; background: #F0EDE6; color: #0A0A0A; border: none; border-radius: 8px; padding: 8px 6px; font-size: 11px; font-weight: 500; cursor: pointer; font-family: inherit; }
+
+        @media (max-width: 480px) {
+          .nav-btn-settings { display: none; }
+        }
       `}</style>
 
-      <nav style={{ background: "#0A0A0A", borderBottom: "0.5px solid rgba(240,237,230,0.08)", padding: "20px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-            <rect width="32" height="32" rx="8" fill="#C4A882"/>
-            <path d="M8 22 C8 22 12 10 16 10 C20 10 20 16 24 12" stroke="#0A0A0A" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-            <circle cx="24" cy="12" r="2.5" fill="#0A0A0A"/>
-            <circle cx="8" cy="22" r="2" fill="#0A0A0A"/>
-          </svg>
-          <div>
-            <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "18px", color: "#F0EDE6", lineHeight: 1 }}>Flow Social</div>
-            {brand && <div style={{ fontSize: "12px", color: "#6B6760", marginTop: "2px" }}>{brand.brand_name}</div>}
+      {/* Nav */}
+      <nav style={{ borderBottom: "0.5px solid rgba(240,237,230,0.08)" }} className="dash-nav">
+        <div className="dash-nav-inner">
+          <div className="nav-logo-row">
+            <svg width="26" height="26" viewBox="0 0 32 32" fill="none" style={{ flexShrink: 0 }}>
+              <rect width="32" height="32" rx="8" fill="#C4A882"/>
+              <path d="M8 22 C8 22 12 10 16 10 C20 10 20 16 24 12" stroke="#0A0A0A" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+              <circle cx="24" cy="12" r="2.5" fill="#0A0A0A"/>
+              <circle cx="8" cy="22" r="2" fill="#0A0A0A"/>
+            </svg>
+            <div style={{ minWidth: 0 }}>
+              <div className="nav-logo-text">Flow Social</div>
+              {brand && <div className="nav-brand-name">{brand.brand_name}</div>}
+            </div>
           </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <button onClick={() => router.push(`/settings/${brand_id}`)}
-            style={{ background: "transparent", color: "#6B6760", border: "0.5px solid rgba(240,237,230,0.1)", borderRadius: "100px", padding: "8px 16px", fontSize: "12px", cursor: "pointer", fontFamily: "inherit" }}>
-            Settings
-          </button>
-          <button onClick={generateContent} disabled={generating}
-            style={{ background: generating ? "#1E1E1C" : "#F0EDE6", color: generating ? "#4A4845" : "#0A0A0A", border: "none", borderRadius: "100px", padding: "10px 22px", fontSize: "13px", fontWeight: 500, cursor: generating ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-            {generating ? "Generating..." : "Generate This Week →"}
-          </button>
+          <div className="nav-actions">
+            <button onClick={() => router.push(`/settings/${brand_id}`)} className="nav-btn-settings">
+              Settings
+            </button>
+            {!isSubscribed && (
+              <button onClick={() => router.push("/upgrade")} className="nav-btn-upgrade">
+                Upgrade
+              </button>
+            )}
+            <button onClick={generateContent} disabled={generating} className="nav-btn-generate">
+              {generating ? "Generating..." : "Generate →"}
+            </button>
+          </div>
         </div>
       </nav>
 
-      <div style={{ maxWidth: "860px", margin: "0 auto", padding: "32px 24px" }}>
+      <div className="dash-body">
 
         {message && (
-          <div style={{ marginBottom: "20px", padding: "12px 16px", borderRadius: "8px", fontSize: "13px", background: messageType === "success" ? "rgba(196,168,130,0.1)" : "rgba(220,38,38,0.1)", border: `0.5px solid ${messageType === "success" ? "rgba(196,168,130,0.3)" : "rgba(220,38,38,0.3)"}`, color: messageType === "success" ? "#C4A882" : "#FCA5A5" }}>
+          <div style={{ marginBottom: "16px", padding: "12px 16px", borderRadius: "8px", fontSize: "13px", background: messageType === "success" ? "rgba(196,168,130,0.1)" : "rgba(220,38,38,0.1)", border: `0.5px solid ${messageType === "success" ? "rgba(196,168,130,0.3)" : "rgba(220,38,38,0.3)"}`, color: messageType === "success" ? "#C4A882" : "#FCA5A5" }}>
             {message}
           </div>
         )}
 
         {!contentPackage && !generating && (
-          <div style={{ textAlign: "center", padding: "80px 24px" }}>
-            <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "64px", color: "rgba(240,237,230,0.04)", marginBottom: "24px", lineHeight: 1 }}>✦</div>
-            <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "28px", color: "#F0EDE6", margin: "0 0 12px" }}>Ready to generate your first week</h2>
-            <p style={{ fontSize: "15px", color: "#6B6760", margin: "0 0 6px", lineHeight: 1.6 }}>One click creates 7 days of premium Instagram content for {brand?.brand_name}</p>
-            <p style={{ fontSize: "13px", color: "#4A4845", margin: "0 0 32px" }}>Add an image to each post then approve to schedule in Buffer</p>
-            <button onClick={generateContent} style={{ background: "#F0EDE6", color: "#0A0A0A", border: "none", borderRadius: "100px", padding: "16px 36px", fontSize: "15px", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+          <div style={{ textAlign: "center", padding: "60px 16px" }}>
+            <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "48px", color: "rgba(240,237,230,0.04)", marginBottom: "20px", lineHeight: 1 }}>✦</div>
+            <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "24px", color: "#F0EDE6", margin: "0 0 10px" }}>Ready to generate your first week</h2>
+            <p style={{ fontSize: "14px", color: "#6B6760", margin: "0 0 6px", lineHeight: 1.6 }}>One click creates 7 days of premium Instagram content for {brand?.brand_name}</p>
+            <p style={{ fontSize: "12px", color: "#4A4845", margin: "0 0 28px" }}>Add an image to each post then approve to schedule in Buffer</p>
+            <button onClick={generateContent} style={{ background: "#F0EDE6", color: "#0A0A0A", border: "none", borderRadius: "100px", padding: "14px 32px", fontSize: "15px", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
               Generate This Week →
             </button>
           </div>
         )}
 
         {generating && (
-          <div style={{ textAlign: "center", padding: "80px 24px" }}>
-            <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "48px", color: "#C4A882", marginBottom: "24px", animation: "pulse 2s ease-in-out infinite" }}>✦</div>
-            <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "24px", color: "#F0EDE6", margin: "0 0 8px" }}>Crafting your content strategy...</h2>
-            <p style={{ fontSize: "14px", color: "#6B6760" }}>Flow Social is writing 7 days of on-brand content. About 20 seconds.</p>
+          <div style={{ textAlign: "center", padding: "60px 16px" }}>
+            <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "48px", color: "#C4A882", marginBottom: "20px", animation: "pulse 2s ease-in-out infinite" }}>✦</div>
+            <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "22px", color: "#F0EDE6", margin: "0 0 8px" }}>Crafting your content strategy...</h2>
+            <p style={{ fontSize: "14px", color: "#6B6760" }}>Flow Social is writing 7 days of on-brand content.</p>
           </div>
         )}
 
         {contentPackage && !generating && (
           <>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
               <div>
-                <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "22px", color: "#F0EDE6", margin: "0 0 4px" }}>Week of {contentPackage.week_start_date}</h2>
-                <p style={{ fontSize: "13px", color: "#4A4845", margin: 0 }}>Add an image then approve to schedule in Buffer</p>
+                <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "20px", color: "#F0EDE6", margin: "0 0 3px" }}>Week of {contentPackage.week_start_date}</h2>
+                <p style={{ fontSize: "12px", color: "#4A4845", margin: 0 }}>Add an image then approve to schedule in Buffer</p>
               </div>
-              <div style={{ fontSize: "13px", color: "#6B6760" }}>
-                <span style={{ color: "#C4A882", fontWeight: 500 }}>{approvedCount}</span> of {contentPackage.content_pieces.length} scheduled
+              <div style={{ fontSize: "12px", color: "#6B6760", flexShrink: 0, marginLeft: "12px" }}>
+                <span style={{ color: "#C4A882", fontWeight: 500 }}>{approvedCount}</span> of {contentPackage.content_pieces.length}
               </div>
             </div>
 
             {contentPackage.content_pieces.map((piece, index) => (
-              <div key={index} style={{ background: "#111111", border: `0.5px solid ${piece.status === "approved" ? "rgba(196,168,130,0.3)" : "rgba(240,237,230,0.06)"}`, borderRadius: "12px", marginBottom: "10px", overflow: "hidden" }}>
-                <div style={{ padding: "20px 24px" }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
+              <div key={index} className="post-card" style={{ border: `0.5px solid ${piece.status === "approved" ? "rgba(196,168,130,0.3)" : "rgba(240,237,230,0.06)"}` }}>
+                <div className="post-card-inner">
+                  <div className="post-row">
 
-                    <div style={{ textAlign: "center", minWidth: "44px" }}>
-                      <div style={{ fontSize: "10px", color: "#4A4845", textTransform: "uppercase", letterSpacing: "1px" }}>{weekDates[(piece.day - 1) % 7]?.day ?? ""}</div>
-                      <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "26px", color: piece.status === "approved" ? "#C4A882" : "#F0EDE6", lineHeight: 1 }}>{weekDates[(piece.day - 1) % 7]?.date ?? piece.day}</div>
-                      <div style={{ fontSize: "10px", color: "#4A4845", textTransform: "uppercase" }}>{weekDates[(piece.day - 1) % 7]?.month ?? ""}</div>
-                      <div style={{ fontSize: "10px", color: "#3A3835", marginTop: "2px" }}>{piece.posting_time}</div>
+                    {/* Day */}
+                    <div className="day-col">
+                      <div className="day-label">{weekDates[(piece.day - 1) % 7]?.day ?? ""}</div>
+                      <div className="day-num" style={{ color: piece.status === "approved" ? "#C4A882" : "#F0EDE6" }}>
+                        {weekDates[(piece.day - 1) % 7]?.date ?? piece.day}
+                      </div>
+                      <div className="day-month">{weekDates[(piece.day - 1) % 7]?.month ?? ""}</div>
+                      <div className="day-time">{piece.posting_time}</div>
                     </div>
 
-                    <div
-                      className="img-wrap"
-                      style={{ width: "76px", height: "76px", borderRadius: "8px", background: "#1A1A18", flexShrink: 0, overflow: "hidden", position: "relative" }}
-                      onMouseEnter={() => setHoveredImage(index)}
-                      onMouseLeave={() => setHoveredImage(null)}
-                    >
+                    {/* Image */}
+                    <div className="img-col img-wrap">
                       {generatingImages.includes(index) ? (
                         <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                           <span style={{ fontSize: "10px", color: "#6B6760" }}>...</span>
@@ -335,8 +385,8 @@ export default function DashboardPage() {
                       ) : piece.image_url ? (
                         <>
                           <img src={piece.image_url} alt={piece.concept} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          <div className="regen-btn" style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} onClick={() => generateImage(index)} title="Generate new image">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F0EDE6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <div className="regen-btn" style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} onClick={() => generateImage(index)}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F0EDE6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
                               <path d="M21 3v5h-5"/>
                               <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
@@ -347,58 +397,53 @@ export default function DashboardPage() {
                       ) : (
                         <button onClick={() => generateImage(index)}
                           style={{ width: "100%", height: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", color: "#3A3835" }}>
-                          <span style={{ fontSize: "18px" }}>+</span>
-                          <span style={{ fontSize: "9px", letterSpacing: "0.5px" }}>IMAGE</span>
+                          <span style={{ fontSize: "16px" }}>+</span>
+                          <span style={{ fontSize: "8px", letterSpacing: "0.5px" }}>IMAGE</span>
                         </button>
                       )}
                     </div>
 
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-                        <span style={{ fontSize: "10px", color: "#6B6760", background: "rgba(240,237,230,0.05)", padding: "2px 8px", borderRadius: "100px", border: "0.5px solid rgba(240,237,230,0.08)", textTransform: "capitalize" }}>{piece.content_type.replace("_", " ")}</span>
-                        <span style={{ fontSize: "10px", color: "#6B6760", background: "rgba(240,237,230,0.05)", padding: "2px 8px", borderRadius: "100px", border: "0.5px solid rgba(240,237,230,0.08)" }}>{piece.content_pillar}</span>
+                    {/* Content */}
+                    <div className="content-col">
+                      <div className="content-tags">
+                        <span className="content-tag">{piece.content_type.replace("_", " ")}</span>
+                        <span className="content-tag">{piece.content_pillar}</span>
                       </div>
-
-                      <p style={{ fontSize: "11px", color: "#4A4845", fontStyle: "italic", margin: "0 0 6px", lineHeight: 1.4 }}>{piece.concept}</p>
-
+                      <p className="content-concept">{piece.concept}</p>
                       {selectedPiece === index ? (
                         <div>
                           <textarea value={editingCaption} onChange={(e) => setEditingCaption(e.target.value)} rows={4}
                             style={{ width: "100%", background: "#0A0A0A", border: "0.5px solid rgba(240,237,230,0.15)", borderRadius: "8px", padding: "10px 12px", fontSize: "13px", color: "#F0EDE6", outline: "none", resize: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
                           <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-                            <button onClick={() => saveCaption(index)} style={{ fontSize: "12px", background: "#F0EDE6", color: "#0A0A0A", border: "none", borderRadius: "100px", padding: "6px 16px", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>Save</button>
-                            <button onClick={() => setSelectedPiece(null)} style={{ fontSize: "12px", background: "transparent", color: "#6B6760", border: "0.5px solid rgba(240,237,230,0.15)", borderRadius: "100px", padding: "6px 16px", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                            <button onClick={() => saveCaption(index)} style={{ fontSize: "12px", background: "#F0EDE6", color: "#0A0A0A", border: "none", borderRadius: "100px", padding: "6px 14px", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>Save</button>
+                            <button onClick={() => setSelectedPiece(null)} style={{ fontSize: "12px", background: "transparent", color: "#6B6760", border: "0.5px solid rgba(240,237,230,0.15)", borderRadius: "100px", padding: "6px 14px", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
                           </div>
                         </div>
                       ) : (
-                        <p onClick={() => { setSelectedPiece(index); setEditingCaption(piece.caption); }}
-                          style={{ fontSize: "13px", color: "#9E9A93", lineHeight: 1.5, margin: "0 0 6px", cursor: "pointer", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>
+                        <p className="content-caption" onClick={() => { setSelectedPiece(index); setEditingCaption(piece.caption); }}>
                           {piece.caption}
                         </p>
                       )}
-
-                      <p style={{ fontSize: "11px", color: "#2A2825", margin: 0 }}>
-                        {piece.hashtags.slice(0, 4).map((h) => `#${h.replace(/#/g, "")}`).join(" ")}
-                        {piece.hashtags.length > 4 && ` +${piece.hashtags.length - 4} more`}
+                      <p className="content-hashtags">
+                        {piece.hashtags.slice(0, 3).map((h) => `#${h.replace(/#/g, "")}`).join(" ")}
+                        {piece.hashtags.length > 3 && ` +${piece.hashtags.length - 3}`}
                       </p>
                     </div>
 
-                    <div style={{ flexShrink: 0, minWidth: "110px" }}>
+                    {/* Action */}
+                    <div className="action-col">
                       {piece.status === "approved" ? (
-                        <button onClick={() => toggleApprove(index)} disabled={approvingIndex === index}
-                          style={{ width: "100%", background: "rgba(34,197,94,0.08)", color: "#4ADE80", border: "0.5px solid rgba(34,197,94,0.25)", borderRadius: "8px", padding: "8px 10px", fontSize: "11px", fontWeight: 500, cursor: "pointer", fontFamily: "inherit", textAlign: "center", lineHeight: 1.5 }}>
+                        <button onClick={() => toggleApprove(index)} disabled={approvingIndex === index} className="btn-scheduled">
                           <div>✓ Scheduled</div>
-                          <div style={{ fontSize: "10px", opacity: 0.7, marginTop: "1px" }}>{formatScheduledTime(piece.post_date, piece.posting_time)}</div>
+                          <div style={{ fontSize: "9px", opacity: 0.7, marginTop: "1px" }}>{formatScheduledTime(piece.post_date, piece.posting_time)}</div>
                         </button>
                       ) : !piece.image_url ? (
-                        <button onClick={() => generateImage(index)} disabled={generatingImages.includes(index)}
-                          style={{ width: "100%", background: "transparent", color: "#4A4845", border: "0.5px solid rgba(240,237,230,0.08)", borderRadius: "8px", padding: "8px 10px", fontSize: "11px", cursor: "pointer", fontFamily: "inherit", textAlign: "center" }}>
-                          {generatingImages.includes(index) ? "Generating..." : "+ Add image"}
+                        <button onClick={() => generateImage(index)} disabled={generatingImages.includes(index)} className="btn-add-image">
+                          {generatingImages.includes(index) ? "..." : "+ Add image"}
                         </button>
                       ) : (
-                        <button onClick={() => toggleApprove(index)} disabled={approvingIndex === index}
-                          style={{ width: "100%", background: "#F0EDE6", color: "#0A0A0A", border: "none", borderRadius: "8px", padding: "8px 10px", fontSize: "12px", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
-                          {approvingIndex === index ? "Scheduling..." : "Approve →"}
+                        <button onClick={() => toggleApprove(index)} disabled={approvingIndex === index} className="btn-approve">
+                          {approvingIndex === index ? "..." : "Approve →"}
                         </button>
                       )}
                     </div>
