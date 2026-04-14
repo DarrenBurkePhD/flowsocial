@@ -77,6 +77,7 @@ export default function DashboardPage() {
   const [generatingImages, setGeneratingImages] = useState<number[]>([]);
   const [regeneratingCaptions, setRegeneratingCaptions] = useState<number[]>([]);
   const [approvingIndex, setApprovingIndex] = useState<number | null>(null);
+  const [gridView, setGridView] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [selectedPiece, setSelectedPiece] = useState<number | null>(null);
@@ -405,10 +406,48 @@ export default function DashboardPage() {
                 <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "20px", color: "#F0EDE6", margin: "0 0 3px" }}>Week of {contentPackage.week_start_date}</h2>
                 <p style={{ fontSize: "12px", color: "#4A4845", margin: 0 }}>Tap a caption to edit — or regenerate it</p>
               </div>
-              <div style={{ fontSize: "12px", color: "#6B6760", flexShrink: 0, marginLeft: "12px" }}>
-                <span style={{ color: "#C4A882", fontWeight: 500 }}>{approvedCount}</span> of {contentPackage.content_pieces.length}
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0, marginLeft: "12px" }}>
+                <div style={{ fontSize: "12px", color: "#6B6760" }}>
+                  <span style={{ color: "#C4A882", fontWeight: 500 }}>{approvedCount}</span> of {contentPackage.content_pieces.length}
+                </div>
+                <button
+                  onClick={() => setGridView(!gridView)}
+                  style={{ background: gridView ? "rgba(196,168,130,0.1)" : "transparent", color: gridView ? "#C4A882" : "#6B6760", border: `0.5px solid ${gridView ? "rgba(196,168,130,0.3)" : "rgba(240,237,230,0.1)"}`, borderRadius: "8px", padding: "5px 10px", fontSize: "11px", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                  {gridView ? "✦ Grid" : "⊞ Grid"}
+                </button>
               </div>
             </div>
+
+            {gridView && (
+              <div style={{ marginBottom: "24px" }}>
+                <p style={{ fontSize: "11px", color: "#4A4845", marginBottom: "10px", textAlign: "center", letterSpacing: "0.5px", textTransform: "uppercase" }}>Instagram Feed Preview</p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "3px", borderRadius: "10px", overflow: "hidden" }}>
+                  {contentPackage.content_pieces.map((piece, index) => (
+                    <div key={index} style={{ aspectRatio: "1", background: "#1A1A18", position: "relative", overflow: "hidden" }}>
+                      {piece.image_url ? (
+                        <img src={piece.image_url} alt={piece.concept} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                          <span style={{ fontSize: "18px", color: "#2A2825" }}>+</span>
+                          <span style={{ fontSize: "8px", color: "#2A2825", textTransform: "uppercase", letterSpacing: "0.5px" }}>No image</span>
+                        </div>
+                      )}
+                      {piece.status === "approved" && (
+                        <div style={{ position: "absolute", top: "4px", right: "4px", width: "16px", height: "16px", borderRadius: "50%", background: "rgba(34,197,94,0.9)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <span style={{ fontSize: "8px", color: "#fff" }}>✓</span>
+                        </div>
+                      )}
+                      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.6))", padding: "12px 4px 4px" }}>
+                        <div style={{ fontSize: "8px", color: "rgba(240,237,230,0.6)", textAlign: "center" }}>
+                          {weekDates[(piece.day - 1) % 7]?.day} {weekDates[(piece.day - 1) % 7]?.date}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ fontSize: "11px", color: "#3A3835", marginTop: "8px", textAlign: "center" }}>Green dot = scheduled. Tap Grid to return to edit view.</p>
+              </div>
+            )}
 
             {contentPackage.content_pieces.map((piece, index) => (
               <div key={index} className="post-card" style={{ border: `0.5px solid ${piece.status === "approved" ? "rgba(196,168,130,0.3)" : "rgba(240,237,230,0.06)"}` }}>

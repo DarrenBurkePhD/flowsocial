@@ -51,6 +51,13 @@ const LOADING_STEPS = [
   "Almost ready...",
 ];
 
+const BUFFER_STEPS = [
+  { step: "1", text: "Go to buffer.com and create a free account" },
+  { step: "2", text: "Connect your Instagram Business account under Channels" },
+  { step: "3", text: "Click your Instagram channel — copy the ID from the URL: buffer.com/channels/YOUR-ID/schedule" },
+  { step: "4", text: "Paste that ID into the field above" },
+];
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -58,6 +65,7 @@ export default function OnboardingPage() {
   const [loadingStep, setLoadingStep] = useState(0);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
+  const [bufferGuideOpen, setBufferGuideOpen] = useState(false);
 
   const [form, setForm] = useState({
     brand_name: "",
@@ -222,11 +230,53 @@ export default function OnboardingPage() {
                 <input type="url" value={form.website_url} onChange={(e) => updateField("website_url", e.target.value)} placeholder="https://yourbrand.com" style={inputStyle} />
                 <p style={{ fontSize: "12px", color: "#4A4845", marginTop: "6px" }}>We will scan your site to understand your products and brand voice.</p>
               </div>
+
+              {/* Buffer Profile ID with expandable guide */}
               <div>
                 <label style={labelStyle}>Buffer Profile ID</label>
-                <input type="text" value={form.buffer_profile_id} onChange={(e) => updateField("buffer_profile_id", e.target.value)} placeholder="e.g. 68a9f9053d2fbc20d49ad446" style={inputStyle} />
-                <p style={{ fontSize: "12px", color: "#4A4845", marginTop: "6px" }}>Find this in your Buffer URL: buffer.com/channels/YOUR-ID/schedule</p>
+                <input
+                  type="text"
+                  value={form.buffer_profile_id}
+                  onChange={(e) => updateField("buffer_profile_id", e.target.value)}
+                  placeholder="e.g. 68a9f9053d2fbc20d49ad446"
+                  style={inputStyle}
+                />
+                <button
+                  onClick={() => setBufferGuideOpen(!bufferGuideOpen)}
+                  style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 0 0", display: "flex", alignItems: "center", gap: "5px" }}
+                >
+                  <span style={{ fontSize: "12px", color: "#C4A882" }}>
+                    {bufferGuideOpen ? "▾" : "▸"} How to set up Buffer and get your Profile ID
+                  </span>
+                </button>
+
+                {bufferGuideOpen && (
+                  <div style={{ marginTop: "10px", background: "#0A0A0A", border: "0.5px solid rgba(196,168,130,0.15)", borderRadius: "10px", padding: "16px 18px" }}>
+                    <p style={{ fontSize: "12px", color: "#6B6760", margin: "0 0 12px", lineHeight: 1.5 }}>
+                      Buffer is the free tool Flow Social uses to schedule your posts to Instagram. Setup takes about 2 minutes.
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                      {BUFFER_STEPS.map((s) => (
+                        <div key={s.step} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                          <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: "rgba(196,168,130,0.15)", border: "0.5px solid rgba(196,168,130,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "1px" }}>
+                            <span style={{ fontSize: "10px", color: "#C4A882", fontWeight: 600 }}>{s.step}</span>
+                          </div>
+                          <p style={{ fontSize: "13px", color: "#9E9A93", margin: 0, lineHeight: 1.5 }}>{s.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                    
+                      href="https://buffer.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: "inline-block", marginTop: "14px", fontSize: "12px", color: "#C4A882", textDecoration: "none", border: "0.5px solid rgba(196,168,130,0.3)", borderRadius: "100px", padding: "6px 14px" }}
+                    >
+                      Open Buffer →
+                    </a>
+                  </div>
+                )}
               </div>
+
               <button onClick={() => setStep(2)} disabled={!form.brand_name || !form.brand_description} style={btnPrimary(!form.brand_name || !form.brand_description)}>Continue</button>
             </div>
           )}
