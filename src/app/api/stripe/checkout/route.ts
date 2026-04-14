@@ -17,10 +17,27 @@ export async function POST(req: NextRequest) {
 
     const { brand_id } = await req.json();
 
+    const { data: existing } = await supabase
+      .from("subscriptions")
+      .select("stripe_customer_id")
+      .eq("user_id", user.id)
+      .single();
+
+    let customerId: string;
+
+    if (existing?.stripe_customer_id) {
+      customerId = existing.stripe_customer_id;
+    } else {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        metadata: { supabase_user_id: user.id },
+      });
+      customerId = customer.id;
+    }
+
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
+      customer: customerId,
       mode: "subscription",
-      customer_email: user.email,
       line_items: [
         {
           price: process.env.STRIPE_PRICE_ID!,
@@ -28,20 +45,11 @@ export async function POST(req: NextRequest) {
         },
       ],
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/${brand_id}?upgraded=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/upgrade`,
-      metadata: {
-        user_id: user.id,
-        brand_id: brand_id || "",
-      },
-      subscription_data: {
-        metadata: {
-          user_id: user.id,
-        },
-      },
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/upgrade?cancelled=true`,
+      metadata: { supabase_user_id: user.id },
     });
 
     return NextResponse.json({ url: session.url });
-
   } catch (err: unknown) {
     console.error("Stripe checkout error:", err);
     return NextResponse.json(
