@@ -83,6 +83,10 @@ export default function DashboardPage() {
     fetchLatestPackage();
   }, [brand_id]);
 
+  useEffect(() => {
+  localStorage.setItem("last_brand_id", brand_id);
+}, [brand_id]);
+
   async function fetchBrand() {
     const res = await fetch(`/api/get-brand?brand_id=${brand_id}`);
     const data = await res.json();

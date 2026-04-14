@@ -1,87 +1,96 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@/lib/supabase/server";
 
-export async function POST(req: NextRequest) {
+function nthSundayOfMonth(year: number, month: number, n: number): Date {
+  const d = new Date(Date.UTC(year, month, 1));
+  const firstSunday = (7 - d.getUTCDay()) % 7;
+  return new Date(Date.UTC(year, month, 1 + firstSunday + (n - 1) * 7));
+}
+
+function getHalifaxOffset(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00Z`);
+  const year = d.getUTCFullYear();
+  const dstStart = nthSundayOfMonth(year, 2, 2); // 2nd Sunday of March
+  const dstEnd = nthSundayOfMonth(year, 10, 1);  // 1st Sunday of November
+  return d >= dstStart && d < dstEnd ? "-03:00" : "-04:00";
+}
+
+function toHalifaxUTC(dateStr: string, timeStr: string): string {
+  const offset = getHalifaxOffset(dateStr);
+  // timeStr may be "HH:MM" or "HH:MM:SS"
+  const time = timeStr.length === 5 ? `${timeStr}:00` : timeStr;
+  return new Date(`${dateStr}T${time}${offset}`).toISOString();
+}
+
+export async function POST(request: NextRequest) {
   try {
-    const { profile_id, text, scheduled_at, image_url, content_type } = await req.json();
-
-    if (!image_url) {
-      return NextResponse.json(
-        { error: "Instagram requires an image. Please add an image before approving." },
-        { status: 400 }
-      );
+    const supabase = createServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const dueAt = new Date(scheduled_at * 1000).toISOString();
-    const instagramType = content_type === "story" ? "story" : "post";
+    const body = await request.json();
+    const { profile_id, caption, image_url, post_date, posting_time } = body;
+
+    if (!profile_id || !caption || !post_date || !posting_time) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    const dueAt = toHalifaxUTC(post_date, posting_time);
 
     const mutation = `
-      mutation CreatePost {
-        createPost(input: {
-          channelId: "${profile_id}",
-          text: ${JSON.stringify(text)},
-          schedulingType: automatic,
-          mode: customScheduled,
-          dueAt: "${dueAt}",
-          assets: {
-            images: [
-              { url: ${JSON.stringify(image_url)} }
-            ]
-          },
-          metadata: {
-            instagram: {
-              type: ${instagramType},
-              shouldShareToFeed: true
-            }
+      mutation CreatePost($input: PostCreateInput!) {
+        postCreate(input: $input) {
+          post {
+            id
+            dueAt
+            status
           }
-        }) {
-          ... on PostActionSuccess {
-            post {
-              id
-              dueAt
-            }
-          }
-          ... on MutationError {
+          errors {
             message
           }
         }
       }
     `;
 
-    const bufferRes = await fetch("https://api.buffer.com", {
+    const variables = {
+      input: {
+        profileIds: [profile_id],
+        text: caption,
+        dueAt,
+        mode: "customScheduled",
+        metadata: {
+          instagram: {
+            type: "post",
+            shouldShareToFeed: true,
+          },
+        },
+        ...(image_url ? { assets: { images: [{ url: image_url }] } } : {}),
+      },
+    };
+
+    const response = await fetch("https://api.buffer.com/graphql", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.BUFFER_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${process.env.BUFFER_ACCESS_TOKEN}`,
       },
-      body: JSON.stringify({ query: mutation }),
+      body: JSON.stringify({ query: mutation, variables }),
     });
 
-    const bufferData = await bufferRes.json();
+    const data = await response.json();
 
-    if (bufferData.errors) {
-      return NextResponse.json(
-        { error: bufferData.errors[0].message },
-        { status: 400 }
-      );
+    if (data.errors || data.data?.postCreate?.errors?.length > 0) {
+      const errors = data.errors || data.data.postCreate.errors;
+      console.error("Buffer API errors:", errors);
+      return NextResponse.json({ error: "Buffer API error", details: errors }, { status: 500 });
     }
 
-    const result = bufferData.data?.createPost;
-
-    if (result?.message) {
-      return NextResponse.json({ error: result.message }, { status: 400 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      buffer_id: result?.post?.id,
-      scheduled_at: result?.post?.dueAt,
-    });
-
-  } catch (err: unknown) {
-    console.error("Buffer push error:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Buffer push failed" },
-      { status: 500 }
-    );
+    const post = data.data?.postCreate?.post;
+    return NextResponse.json({ success: true, post, dueAt });
+  } catch (error) {
+    console.error("push-single-to-buffer error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
