@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -48,6 +48,13 @@ type BrandAsset = {
   asset_type: string;
 };
 
+type ImageAlternative = {
+  url: string;
+  source: "brand" | "unsplash" | "ai";
+};
+
+// ---- helpers ----
+
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -63,9 +70,7 @@ async function fetchPexelsImages(query: string, count: number): Promise<string[]
     if (!res.ok) return [];
     const data = await res.json();
     return (data.photos || []).slice(0, count).map((p: { url: string }) => p.url);
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
 async function buildPexelsQuery(imagePrompt: string, concept: string, contentPillar: string, brandDna: Brand["brand_dna"]): Promise<string> {
@@ -74,9 +79,7 @@ async function buildPexelsQuery(imagePrompt: string, concept: string, contentPil
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        image_prompt: imagePrompt,
-        concept,
-        content_pillar: contentPillar,
+        image_prompt: imagePrompt, concept, content_pillar: contentPillar,
         aesthetic_direction: brandDna?.aesthetic_direction || "",
         products: brandDna?.products || [],
         content_pillars: brandDna?.content_pillars || [],
@@ -87,16 +90,12 @@ async function buildPexelsQuery(imagePrompt: string, concept: string, contentPil
     if (!res.ok) throw new Error("failed");
     const data = await res.json();
     return data.query || contentPillar;
-  } catch {
-    return contentPillar;
-  }
+  } catch { return contentPillar; }
 }
 
 async function fetchPexelsForConcept(concept: string, contentPillar: string, brandDna: Brand["brand_dna"], count: number = 1, imagePrompt?: string): Promise<string[]> {
   let primaryQuery = contentPillar;
-  if (imagePrompt) {
-    primaryQuery = await buildPexelsQuery(imagePrompt, concept, contentPillar, brandDna);
-  }
+  if (imagePrompt) primaryQuery = await buildPexelsQuery(imagePrompt, concept, contentPillar, brandDna);
   let urls = await fetchPexelsImages(primaryQuery, count);
   if (urls.length < count) {
     const fallback = await fetchPexelsImages(contentPillar, count - urls.length);
@@ -110,17 +109,12 @@ async function assignImages(pieces: ContentPiece[], brandAssets: BrandAsset[], b
   const shuffledAssets = shuffle([...brandAssets]);
   let assetIndex = 0;
   const result: ContentPiece[] = [];
-
   for (let i = 0; i < pieces.length; i++) {
     const piece = pieces[i];
     const isCarousel = piece.content_type === "carousel";
-
     if (isCarousel) {
-      // Carousels always get 3 contextual Pexels images
-      // Mix brand assets in if available
       const carouselUrls: string[] = [];
       const carouselSources: string[] = [];
-
       for (let s = 0; s < 3; s++) {
         const useBrand = hasBrandAssets && Math.random() < 0.6 && assetIndex < shuffledAssets.length;
         if (useBrand) {
@@ -129,31 +123,19 @@ async function assignImages(pieces: ContentPiece[], brandAssets: BrandAsset[], b
           assetIndex++;
         } else {
           const urls = await fetchPexelsForConcept(piece.concept, piece.content_pillar, brandDna, 1, piece.image_prompt);
-          if (urls.length) {
-            carouselUrls.push(urls[0]);
-            carouselSources.push("unsplash");
-          }
+          if (urls.length) { carouselUrls.push(urls[0]); carouselSources.push("unsplash"); }
         }
       }
-
-      result.push({
-        ...piece,
-        image_url: carouselUrls[0] || undefined,
-        carousel_urls: carouselUrls.length > 0 ? carouselUrls : undefined,
-        image_source: (carouselSources[0] as "brand" | "unsplash") || null,
-      });
+      result.push({ ...piece, image_url: carouselUrls[0] || undefined, carousel_urls: carouselUrls.length > 0 ? carouselUrls : undefined, image_source: (carouselSources[0] as "brand" | "unsplash") || null });
     } else {
       const useBrand = hasBrandAssets && Math.random() < 0.6 && assetIndex < shuffledAssets.length;
-      if (useBrand) {
-        result.push({ ...piece, image_url: shuffledAssets[assetIndex].public_url, image_source: "brand" });
-        assetIndex++;
-      } else {
+      if (useBrand) { result.push({ ...piece, image_url: shuffledAssets[assetIndex].public_url, image_source: "brand" }); assetIndex++; }
+      else {
         const urls = await fetchPexelsForConcept(piece.concept, piece.content_pillar, brandDna, 1, piece.image_prompt);
         result.push({ ...piece, image_url: urls[0] || piece.image_url || undefined, image_source: urls[0] ? "unsplash" : (piece.image_source || null) });
       }
     }
   }
-
   return result;
 }
 
@@ -163,12 +145,7 @@ function getWeekDates(startDate: string) {
   for (let i = 0; i < 7; i++) {
     const date = new Date(start);
     date.setDate(start.getDate() + i);
-    dates.push({
-      day: date.toLocaleDateString("en-US", { weekday: "short" }),
-      date: date.getDate(),
-      month: date.toLocaleDateString("en-US", { month: "short" }),
-      full: date.toISOString().split("T")[0],
-    });
+    dates.push({ day: date.toLocaleDateString("en-US", { weekday: "short" }), date: date.getDate(), month: date.toLocaleDateString("en-US", { month: "short" }), full: date.toISOString().split("T")[0] });
   }
   return dates;
 }
@@ -200,67 +177,197 @@ function isThisWeeksPackage(weekStartDate: string): boolean {
   const monday = getThisWeekMonday();
   const pkgDate = new Date(weekStartDate);
   const monDate = new Date(monday);
-  const diffDays = Math.abs((pkgDate.getTime() - monDate.getTime()) / (1000 * 60 * 60 * 24));
-  return diffDays < 7;
+  return Math.abs((pkgDate.getTime() - monDate.getTime()) / (1000 * 60 * 60 * 24)) < 7;
 }
 
-function ImageSourceLabel({ source }: { source?: "brand" | "unsplash" | "ai" | null }) {
+function sourceLabel(source?: "brand" | "unsplash" | "ai" | null) {
   if (!source) return null;
-  const config = {
-    brand: { label: "Your photo", color: "#C4A882" },
-    unsplash: { label: "Stock", color: "#4A4845" },
-    ai: { label: "AI generated", color: "#4A4845" },
-  };
-  const c = config[source];
-  if (!c) return null;
-  return (
-    <div style={{ fontSize: "9px", color: c.color, marginTop: "3px", textAlign: "center", letterSpacing: "0.2px" }}>
-      {c.label}
-    </div>
-  );
+  return source === "brand" ? "Your photo" : source === "unsplash" ? "Stock" : "AI";
 }
 
-function CarouselThumbs({ urls, loading, onRegen }: { urls: string[]; loading: boolean; onRegen: () => void }) {
-  const slots = [0, 1, 2];
+function sourceColor(source?: "brand" | "unsplash" | "ai" | null) {
+  return source === "brand" ? "#C4A882" : "#4A4845";
+}
+
+// ---- Lightbox ----
+
+function Lightbox({ urls, initialIndex, source, onClose }: { urls: string[]; initialIndex: number; source?: string; onClose: () => void }) {
+  const [idx, setIdx] = useState(initialIndex);
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") setIdx(i => Math.min(i + 1, urls.length - 1));
+      if (e.key === "ArrowLeft") setIdx(i => Math.max(i - 1, 0));
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [urls.length, onClose]);
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-      <div style={{ display: "flex", gap: "3px", position: "relative" }}
-        onMouseEnter={(e) => { const o = e.currentTarget.querySelector(".carousel-regen") as HTMLElement; if (o) o.style.opacity = "1"; }}
-        onMouseLeave={(e) => { const o = e.currentTarget.querySelector(".carousel-regen") as HTMLElement; if (o) o.style.opacity = "0"; }}>
-        {slots.map((s) => (
-          <div key={s} style={{ width: "40px", height: "56px", borderRadius: s === 0 ? "6px 0 0 6px" : s === 2 ? "0 6px 6px 0" : "0", background: "#1A1A18", overflow: "hidden", position: "relative", flexShrink: 0 }}>
-            {loading ? (
-              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontSize: "8px", color: "#3A3835" }}>...</span>
-              </div>
-            ) : urls[s] ? (
-              <img src={urls[s]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            ) : (
-              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontSize: "14px", color: "#2A2825" }}>+</span>
-              </div>
-            )}
-            {s === 1 && (
-              <div style={{ position: "absolute", top: "2px", right: "2px", width: "12px", height: "12px", borderRadius: "2px", background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontSize: "7px", color: "#9E9A93" }}>⊞</span>
-              </div>
-            )}
-          </div>
-        ))}
-        {/* Regen overlay */}
-        <div className="carousel-regen" style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", opacity: 0, transition: "opacity 0.2s" }} onClick={onRegen}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F0EDE6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-            <path d="M21 3v5h-5"/>
-            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-            <path d="M8 16H3v5"/>
-          </svg>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+      <div onClick={e => e.stopPropagation()} style={{ position: "relative", maxWidth: "min(600px, 90vw)", width: "100%" }}>
+        <img src={urls[idx]} alt="" style={{ width: "100%", borderRadius: "12px", display: "block", maxHeight: "80vh", objectFit: "contain" }} />
+        {/* Close */}
+        <button onClick={onClose} style={{ position: "absolute", top: "-14px", right: "-14px", width: "32px", height: "32px", borderRadius: "50%", background: "#1A1A18", border: "0.5px solid rgba(240,237,230,0.15)", color: "#F0EDE6", fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit" }}>×</button>
+        {/* Arrows */}
+        {idx > 0 && (
+          <button onClick={() => setIdx(i => i - 1)} style={{ position: "absolute", left: "-44px", top: "50%", transform: "translateY(-50%)", width: "32px", height: "32px", borderRadius: "50%", background: "#1A1A18", border: "0.5px solid rgba(240,237,230,0.15)", color: "#F0EDE6", fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
+        )}
+        {idx < urls.length - 1 && (
+          <button onClick={() => setIdx(i => i + 1)} style={{ position: "absolute", right: "-44px", top: "50%", transform: "translateY(-50%)", width: "32px", height: "32px", borderRadius: "50%", background: "#1A1A18", border: "0.5px solid rgba(240,237,230,0.15)", color: "#F0EDE6", fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
+        )}
+        {/* Counter + source */}
+        <div style={{ marginTop: "12px", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px" }}>
+          {urls.length > 1 && (
+            <div style={{ display: "flex", gap: "6px" }}>
+              {urls.map((_, i) => (
+                <div key={i} onClick={() => setIdx(i)} style={{ width: "6px", height: "6px", borderRadius: "50%", background: i === idx ? "#C4A882" : "#3A3835", cursor: "pointer" }} />
+              ))}
+            </div>
+          )}
+          {source && <span style={{ fontSize: "11px", color: "#4A4845" }}>{source}</span>}
         </div>
       </div>
-      <div style={{ fontSize: "9px", color: "#4A4845", marginTop: "3px", textAlign: "center" }}>3 slides</div>
     </div>
   );
 }
+
+// ---- Image panel (active + alternatives) ----
+
+function ImagePanel({
+  piece, index, loading, brandAssets, brandDna,
+  onSelectImage, onGenerateAI,
+}: {
+  piece: ContentPiece;
+  index: number;
+  loading: boolean;
+  brandAssets: BrandAsset[];
+  brandDna: Brand["brand_dna"];
+  onSelectImage: (index: number, url: string, source: "brand" | "unsplash" | "ai") => void;
+  onGenerateAI: (index: number) => void;
+}) {
+  const [lightbox, setLightbox] = useState<{ urls: string[]; idx: number } | null>(null);
+  const [alts, setAlts] = useState<ImageAlternative[]>([]);
+  const [loadingAlts, setLoadingAlts] = useState(false);
+
+  const isCarousel = piece.content_type === "carousel";
+  const carouselUrls = piece.carousel_urls || (piece.image_url ? [piece.image_url] : []);
+
+  async function fetchAlternatives() {
+    setLoadingAlts(true);
+    try {
+      // Alt 1: another Pexels image
+      const pexelsUrls = await fetchPexelsForConcept(piece.concept, piece.content_pillar, brandDna, 1, piece.image_prompt);
+      // Alt 2: a brand asset if available and different from current
+      const available = brandAssets.filter(a => a.public_url !== piece.image_url);
+      const brandAlt = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : null;
+      const newAlts: ImageAlternative[] = [];
+      if (pexelsUrls[0]) newAlts.push({ url: pexelsUrls[0], source: "unsplash" });
+      if (brandAlt) newAlts.push({ url: brandAlt.public_url, source: "brand" });
+      setAlts(newAlts);
+    } finally {
+      setLoadingAlts(false);
+    }
+  }
+
+  // Load alternatives when piece loads and has an image
+  useEffect(() => {
+    if (piece.image_url && !isCarousel) fetchAlternatives();
+  }, [piece.image_url]);
+
+  if (isCarousel) {
+    return (
+      <>
+        {lightbox && <Lightbox urls={lightbox.urls} initialIndex={lightbox.idx} source="Carousel" onClose={() => setLightbox(null)} />}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+          <div style={{ display: "flex", gap: "3px", cursor: "pointer" }} onClick={() => carouselUrls.length && setLightbox({ urls: carouselUrls, idx: 0 })}>
+            {[0, 1, 2].map((s) => (
+              <div key={s} style={{ width: "40px", height: "56px", borderRadius: s === 0 ? "6px 0 0 6px" : s === 2 ? "0 6px 6px 0" : "0", background: "#1A1A18", overflow: "hidden", position: "relative", flexShrink: 0 }}>
+                {loading ? <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: "8px", color: "#3A3835" }}>...</span></div>
+                  : carouselUrls[s] ? <img src={carouselUrls[s]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: "14px", color: "#2A2825" }}>+</span></div>}
+                {s === 1 && <div style={{ position: "absolute", top: "2px", right: "2px", width: "12px", height: "12px", borderRadius: "2px", background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: "7px", color: "#9E9A93" }}>⊞</span></div>}
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: "9px", color: "#4A4845", marginTop: "3px", textAlign: "center" }}>tap to preview</div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {lightbox && <Lightbox urls={lightbox.urls} initialIndex={lightbox.idx} source={sourceLabel(piece.image_source) || undefined} onClose={() => setLightbox(null)} />}
+      <div className="img-col">
+        {/* Active image */}
+        <div className="img-thumb img-wrap" style={{ cursor: piece.image_url ? "pointer" : "default" }} onClick={() => piece.image_url && setLightbox({ urls: [piece.image_url], idx: 0 })}>
+          {loading ? (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: "10px", color: "#6B6760" }}>...</span>
+            </div>
+          ) : piece.image_url ? (
+            <img src={piece.image_url} alt={piece.concept} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : (
+            <button onClick={(e) => { e.stopPropagation(); onGenerateAI(index); }} style={{ width: "100%", height: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", color: "#3A3835" }}>
+              <span style={{ fontSize: "16px" }}>+</span>
+              <span style={{ fontSize: "8px", letterSpacing: "0.5px" }}>IMAGE</span>
+            </button>
+          )}
+        </div>
+
+        {/* Source label */}
+        {piece.image_source && (
+          <div style={{ fontSize: "9px", color: sourceColor(piece.image_source), marginTop: "3px", textAlign: "center" }}>
+            {sourceLabel(piece.image_source)}
+          </div>
+        )}
+
+        {/* Alternatives strip */}
+        {piece.image_url && (
+          <div style={{ marginTop: "6px", display: "flex", gap: "3px", alignItems: "center" }}>
+            {loadingAlts ? (
+              <div style={{ fontSize: "8px", color: "#3A3835", width: "64px", textAlign: "center" }}>...</div>
+            ) : (
+              <>
+                {alts.map((alt, ai) => (
+                  <div key={ai}
+                    onClick={() => { onSelectImage(index, alt.url, alt.source); }}
+                    title={alt.source === "brand" ? "Your photo" : "Stock photo"}
+                    style={{ width: "28px", height: "28px", borderRadius: "4px", overflow: "hidden", cursor: "pointer", border: "0.5px solid rgba(240,237,230,0.1)", flexShrink: 0, position: "relative" }}>
+                    <img src={alt.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </div>
+                ))}
+                {/* AI generate button */}
+                <div
+                  onClick={() => onGenerateAI(index)}
+                  title="Generate AI image"
+                  style={{ width: "28px", height: "28px", borderRadius: "4px", background: "#1A1A18", border: "0.5px solid rgba(240,237,230,0.1)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6B6760" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                </div>
+                {/* Refresh alts button */}
+                <div
+                  onClick={fetchAlternatives}
+                  title="Get new options"
+                  style={{ width: "28px", height: "28px", borderRadius: "4px", background: "#1A1A18", border: "0.5px solid rgba(240,237,230,0.1)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#6B6760" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                    <path d="M21 3v5h-5"/>
+                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                    <path d="M8 16H3v5"/>
+                  </svg>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ---- Main page ----
 
 export default function DashboardPage() {
   const params = useParams();
@@ -329,15 +436,10 @@ export default function DashboardPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       const piecesWithImages = await assignImages(data.content_pieces, brandAssets, brand?.brand_dna);
-      const newPackage = {
-        id: data.package_id,
-        status: "ready_for_review",
-        content_pieces: piecesWithImages,
-        week_start_date: new Date().toISOString().split("T")[0],
-      };
+      const newPackage = { id: data.package_id, status: "ready_for_review", content_pieces: piecesWithImages, week_start_date: new Date().toISOString().split("T")[0] };
       setContentPackage(newPackage);
       await persistPieces(data.package_id, piecesWithImages);
-      showMessage("7 posts ready. Review images and approve to schedule.", "success");
+      showMessage("7 posts ready. Review and approve to schedule.", "success");
     } catch (err: unknown) {
       showMessage(err instanceof Error ? err.message : "Generation failed", "error");
     } finally {
@@ -345,29 +447,15 @@ export default function DashboardPage() {
     }
   }
 
-  async function regenerateCarousel(index: number) {
+  function handleSelectImage(index: number, url: string, source: "brand" | "unsplash" | "ai") {
     if (!contentPackage) return;
-    setGeneratingImages((prev) => [...prev, index]);
-    try {
-      const piece = contentPackage.content_pieces[index];
-      const urls = await fetchPexelsForConcept(piece.concept, piece.content_pillar, brand?.brand_dna, 3, piece.image_prompt);
-      const updated = [...contentPackage.content_pieces];
-      updated[index] = {
-        ...updated[index],
-        image_url: urls[0] || updated[index].image_url,
-        carousel_urls: urls.length > 0 ? urls : updated[index].carousel_urls,
-        image_source: "unsplash",
-      };
-      setContentPackage({ ...contentPackage, content_pieces: updated });
-      await persistPieces(contentPackage.id, updated);
-    } catch (err: unknown) {
-      showMessage(err instanceof Error ? err.message : "Image refresh failed", "error");
-    } finally {
-      setGeneratingImages((prev) => prev.filter((i) => i !== index));
-    }
+    const updated = [...contentPackage.content_pieces];
+    updated[index] = { ...updated[index], image_url: url, image_source: source };
+    setContentPackage({ ...contentPackage, content_pieces: updated });
+    persistPieces(contentPackage.id, updated);
   }
 
-  async function generateImage(index: number) {
+  async function handleGenerateAI(index: number) {
     if (!contentPackage) return;
     setGeneratingImages((prev) => [...prev, index]);
     try {
@@ -375,12 +463,7 @@ export default function DashboardPage() {
       const res = await fetch("/api/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image_prompt: piece.image_prompt,
-          content_type: piece.content_type,
-          image_style: brand?.brand_dna?.image_style || "",
-          image_preferences: brand?.brand_dna?.image_preferences || {},
-        }),
+        body: JSON.stringify({ image_prompt: piece.image_prompt, content_type: piece.content_type, image_style: brand?.brand_dna?.image_style || "", image_preferences: brand?.brand_dna?.image_preferences || {} }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -403,10 +486,7 @@ export default function DashboardPage() {
       const res = await fetch("/api/regenerate-caption", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          brand_id, concept: piece.concept, content_type: piece.content_type,
-          content_pillar: piece.content_pillar, cta: piece.cta, hashtags: piece.hashtags, current_caption: piece.caption,
-        }),
+        body: JSON.stringify({ brand_id, concept: piece.concept, content_type: piece.content_type, content_pillar: piece.content_pillar, cta: piece.cta, hashtags: piece.hashtags, current_caption: piece.caption }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -436,7 +516,7 @@ export default function DashboardPage() {
     if (!contentPackage || approvingIndex === index) return;
     const piece = contentPackage.content_pieces[index];
     if (piece.status !== "approved" && !piece.image_url) {
-      showMessage("Add images first — Instagram requires at least one.", "error");
+      showMessage("Add an image first — Instagram requires one.", "error");
       return;
     }
     setApprovingIndex(index);
@@ -459,23 +539,11 @@ ${piece.cta}
 
 ${cleanHashtags}`;
         const scheduledAt = Math.floor(new Date(`${piece.post_date}T${piece.posting_time}:00-03:00`).getTime() / 1000);
-
-        // For carousels send all image URLs, otherwise just the one
-        const imageUrl = piece.content_type === "carousel" && piece.carousel_urls?.length
-          ? piece.carousel_urls[0]
-          : piece.image_url || null;
-
+        const imageUrl = piece.content_type === "carousel" && piece.carousel_urls?.length ? piece.carousel_urls[0] : piece.image_url || null;
         const res = await fetch("/api/push-single-to-buffer", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            profile_id: brand.buffer_profile_id,
-            text: fullCaption,
-            scheduled_at: scheduledAt,
-            image_url: imageUrl,
-            image_urls: piece.content_type === "carousel" ? piece.carousel_urls : undefined,
-            content_type: piece.content_type,
-          }),
+          body: JSON.stringify({ profile_id: brand.buffer_profile_id, text: fullCaption, scheduled_at: scheduledAt, image_url: imageUrl, image_urls: piece.content_type === "carousel" ? piece.carousel_urls : undefined, content_type: piece.content_type }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
@@ -510,9 +578,6 @@ ${cleanHashtags}`;
     <main style={{ minHeight: "100vh", background: "#0A0A0A", color: "#F0EDE6", fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
-        .regen-btn { opacity: 0; transition: opacity 0.2s; }
-        .img-wrap:hover .regen-btn { opacity: 1; }
-        .carousel-regen { opacity: 0; transition: opacity 0.2s; }
         .dash-nav { padding: 14px 20px; border-bottom: 0.5px solid rgba(240,237,230,0.08); }
         .dash-nav-inner { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .nav-logo-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -620,7 +685,7 @@ ${cleanHashtags}`;
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
               <div>
                 <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "20px", color: "#F0EDE6", margin: "0 0 3px" }}>Week of {contentPackage.week_start_date}</h2>
-                <p style={{ fontSize: "12px", color: "#4A4845", margin: 0 }}>Tap a caption to edit — or regenerate it</p>
+                <p style={{ fontSize: "12px", color: "#4A4845", margin: 0 }}>Tap a caption to edit. Tap an image to preview or swap.</p>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0, marginLeft: "12px" }}>
                 <div style={{ fontSize: "12px", color: "#6B6760" }}>
@@ -639,25 +704,12 @@ ${cleanHashtags}`;
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "3px", borderRadius: "10px", overflow: "hidden" }}>
                   {contentPackage.content_pieces.map((piece, index) => (
                     <div key={index} style={{ aspectRatio: "1", background: "#1A1A18", position: "relative", overflow: "hidden" }}>
-                      {piece.image_url ? (
-                        <img src={piece.image_url} alt={piece.concept} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      ) : (
-                        <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px" }}>
-                          <span style={{ fontSize: "18px", color: "#2A2825" }}>+</span>
-                        </div>
-                      )}
-                      {piece.content_type === "carousel" && (
-                        <div style={{ position: "absolute", top: "4px", left: "4px", background: "rgba(0,0,0,0.6)", borderRadius: "3px", padding: "1px 4px", fontSize: "7px", color: "#9E9A93" }}>⊞ 3</div>
-                      )}
-                      {piece.status === "approved" && (
-                        <div style={{ position: "absolute", top: "4px", right: "4px", width: "16px", height: "16px", borderRadius: "50%", background: "rgba(34,197,94,0.9)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <span style={{ fontSize: "8px", color: "#fff" }}>✓</span>
-                        </div>
-                      )}
+                      {piece.image_url ? <img src={piece.image_url} alt={piece.concept} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        : <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px" }}><span style={{ fontSize: "18px", color: "#2A2825" }}>+</span></div>}
+                      {piece.content_type === "carousel" && <div style={{ position: "absolute", top: "4px", left: "4px", background: "rgba(0,0,0,0.6)", borderRadius: "3px", padding: "1px 4px", fontSize: "7px", color: "#9E9A93" }}>⊞ 3</div>}
+                      {piece.status === "approved" && <div style={{ position: "absolute", top: "4px", right: "4px", width: "16px", height: "16px", borderRadius: "50%", background: "rgba(34,197,94,0.9)", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: "8px", color: "#fff" }}>✓</span></div>}
                       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.6))", padding: "12px 4px 4px" }}>
-                        <div style={{ fontSize: "8px", color: "rgba(240,237,230,0.6)", textAlign: "center" }}>
-                          {weekDates[(piece.day - 1) % 7]?.day} {weekDates[(piece.day - 1) % 7]?.date}
-                        </div>
+                        <div style={{ fontSize: "8px", color: "rgba(240,237,230,0.6)", textAlign: "center" }}>{weekDates[(piece.day - 1) % 7]?.day} {weekDates[(piece.day - 1) % 7]?.date}</div>
                       </div>
                     </div>
                   ))}
@@ -667,10 +719,7 @@ ${cleanHashtags}`;
             )}
 
             {contentPackage.content_pieces.map((piece, index) => {
-              const isCarousel = piece.content_type === "carousel";
-              const carouselUrls = piece.carousel_urls || (piece.image_url ? [piece.image_url] : []);
               const hasImage = !!piece.image_url;
-
               return (
                 <div key={index} className="post-card" style={{ border: `0.5px solid ${piece.status === "approved" ? "rgba(196,168,130,0.3)" : "rgba(240,237,230,0.06)"}` }}>
                   <div className="post-card-inner">
@@ -682,42 +731,15 @@ ${cleanHashtags}`;
                           <div className="day-month">{weekDates[(piece.day - 1) % 7]?.month ?? ""}</div>
                           <div className="day-time">{piece.posting_time}</div>
                         </div>
-
-                        {isCarousel ? (
-                          <CarouselThumbs
-                            urls={carouselUrls}
-                            loading={generatingImages.includes(index)}
-                            onRegen={() => regenerateCarousel(index)}
-                          />
-                        ) : (
-                          <div className="img-col">
-                            <div className="img-thumb img-wrap">
-                              {generatingImages.includes(index) ? (
-                                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                  <span style={{ fontSize: "10px", color: "#6B6760" }}>...</span>
-                                </div>
-                              ) : piece.image_url ? (
-                                <>
-                                  <img src={piece.image_url} alt={piece.concept} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                  <div className="regen-btn" style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} onClick={() => generateImage(index)}>
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F0EDE6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-                                      <path d="M21 3v5h-5"/>
-                                      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-                                      <path d="M8 16H3v5"/>
-                                    </svg>
-                                  </div>
-                                </>
-                              ) : (
-                                <button onClick={() => generateImage(index)} style={{ width: "100%", height: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", color: "#3A3835" }}>
-                                  <span style={{ fontSize: "16px" }}>+</span>
-                                  <span style={{ fontSize: "8px", letterSpacing: "0.5px" }}>IMAGE</span>
-                                </button>
-                              )}
-                            </div>
-                            <ImageSourceLabel source={piece.image_source} />
-                          </div>
-                        )}
+                        <ImagePanel
+                          piece={piece}
+                          index={index}
+                          loading={generatingImages.includes(index)}
+                          brandAssets={brandAssets}
+                          brandDna={brand?.brand_dna}
+                          onSelectImage={handleSelectImage}
+                          onGenerateAI={handleGenerateAI}
+                        />
                       </div>
 
                       <div className="content-col">
@@ -755,8 +777,8 @@ ${cleanHashtags}`;
                             <div style={{ fontSize: "9px", opacity: 0.7, marginTop: "1px" }}>{formatScheduledTime(piece.post_date, piece.posting_time)}</div>
                           </button>
                         ) : !hasImage ? (
-                          <button onClick={() => isCarousel ? regenerateCarousel(index) : generateImage(index)} disabled={generatingImages.includes(index)} className="btn-add-image">
-                            {generatingImages.includes(index) ? "..." : "+ Add images"}
+                          <button onClick={() => handleGenerateAI(index)} disabled={generatingImages.includes(index)} className="btn-add-image">
+                            {generatingImages.includes(index) ? "..." : "+ Add image"}
                           </button>
                         ) : (
                           <button onClick={() => toggleApprove(index)} disabled={approvingIndex === index} className="btn-approve">
