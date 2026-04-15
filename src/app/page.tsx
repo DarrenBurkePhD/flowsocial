@@ -30,20 +30,30 @@ export default function Home() {
 
       {/* Nav */}
       <nav className="fs-nav" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "28px 48px", borderBottom: "0.5px solid rgba(240,237,230,0.1)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+        <style>{`
+          @media (max-width: 600px) {
+            .fs-nav { padding: 14px 20px !important; }
+            .fs-nav-icon { width: 22px !important; height: 22px !important; }
+            .fs-nav-wordmark { font-size: 15px !important; }
+            .fs-nav-signin { padding: 7px 12px !important; font-size: 11px !important; }
+            .fs-nav-trial { padding: 7px 14px !important; font-size: 11px !important; }
+            .fs-nav-gap { gap: 8px !important; }
+          }
+        `}</style>
+        <div className="fs-nav-gap" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <svg className="fs-nav-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
             <rect width="32" height="32" rx="8" fill="#C4A882"/>
             <path d="M8 22 C8 22 12 10 16 10 C20 10 20 16 24 12" stroke="#0A0A0A" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
             <circle cx="24" cy="12" r="2.5" fill="#0A0A0A"/>
             <circle cx="8" cy="22" r="2" fill="#0A0A0A"/>
           </svg>
-          <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: "20px", color: "#F0EDE6", letterSpacing: "-0.3px" }}>Flow Social</span>
+          <span className="fs-nav-wordmark" style={{ fontFamily: "'DM Serif Display', serif", fontSize: "20px", color: "#F0EDE6", letterSpacing: "-0.3px", whiteSpace: "nowrap" }}>Flow Social</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <Link href="/auth" style={{ background: "transparent", color: "#9E9A93", padding: "10px 18px", borderRadius: "100px", fontSize: "13px", fontWeight: 400, textDecoration: "none", border: "0.5px solid rgba(240,237,230,0.15)" }}>
+        <div className="fs-nav-gap" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <Link href="/auth" className="fs-nav-signin" style={{ background: "transparent", color: "#9E9A93", padding: "10px 18px", borderRadius: "100px", fontSize: "13px", fontWeight: 400, textDecoration: "none", border: "0.5px solid rgba(240,237,230,0.15)", whiteSpace: "nowrap" }}>
             Sign in
           </Link>
-          <Link href="/onboarding" style={{ background: "#F0EDE6", color: "#0A0A0A", padding: "10px 22px", borderRadius: "100px", fontSize: "13px", fontWeight: 500, textDecoration: "none" }}>
+          <Link href="/onboarding" className="fs-nav-trial" style={{ background: "#F0EDE6", color: "#0A0A0A", padding: "10px 22px", borderRadius: "100px", fontSize: "13px", fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap" }}>
             Start free trial
           </Link>
         </div>
