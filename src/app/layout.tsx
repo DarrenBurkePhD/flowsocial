@@ -15,20 +15,33 @@ const dmSerifDisplay = DM_Serif_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Flow Social — AI Instagram Content Engine for Founders",
-  description: "Flow Social turns your brand story into a full week of premium Instagram content, written, designed, and scheduled automatically. No agency. No freelancer. No time wasted.",
-  keywords: ["Instagram content tool for founders", "AI Instagram scheduling for CPG brands", "social media automation for food brands", "Instagram content generator for product brands", "AI social media manager"],
+  title: "Flow Social — The AI Brand Engine That Replaces Your Agency",
+  description: "Flow Social replaces your social media agency. AI-powered content strategy, captions, images, and scheduling — built from your brand DNA, generated in seconds. Now in beta.",
+  keywords: [
+    "replace social media agency",
+    "AI content engine for brands",
+    "Instagram automation for founders",
+    "AI brand content generator",
+    "social media agency alternative",
+    "CPG brand content automation",
+    "consumer brand Instagram tool",
+  ],
   openGraph: {
-    title: "Flow Social — AI Instagram Content Engine for Founders",
-    description: "One click generates 7 days of on-brand Instagram content and schedules it automatically. Built for consumer product founders.",
+    title: "Flow Social — The AI Brand Engine That Replaces Your Agency",
+    description: "Stop paying agency retainers. Flow Social generates a full week of on-brand Instagram content in 30 seconds — strategy, captions, images, scheduled automatically.",
     url: "https://flowsocial.ai",
     siteName: "Flow Social",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Flow Social — AI Instagram Content Engine for Founders",
-    description: "One click generates 7 days of on-brand Instagram content and schedules it automatically.",
+    title: "Flow Social — The AI Brand Engine That Replaces Your Agency",
+    description: "Stop paying agency retainers. Flow Social generates a full week of on-brand Instagram content in 30 seconds.",
+  },
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
   },
   metadataBase: new URL("https://flowsocial.ai"),
 };
