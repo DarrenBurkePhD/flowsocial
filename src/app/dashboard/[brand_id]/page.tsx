@@ -68,24 +68,26 @@ async function fetchPexelsImages(query: string, count: number): Promise<string[]
   }
 }
 
-async function fetchPexelsForConcept(concept: string, contentPillar: string, brandDna: Brand["brand_dna"], count: number = 1, imagePrompt?: string): Promise<string[]> {
-  // Use image_prompt as primary query — it is written to describe the visual scene
-  // Fall back to concept words + aesthetic direction if no prompt available
-  let primaryQuery = "";
-  if (imagePrompt) {
-    // Strip "no product packaging" type instructions, take first 6 meaningful words
-    const cleaned = imagePrompt
-      .replace(/no product packaging.*$/i, "")
-      .replace(/never include.*$/i, "")
-      .replace(/avoid.*$/i, "")
-      .trim();
-    primaryQuery = cleaned.split(/[,.]/).slice(0, 2).join(" ").trim().split(" ").slice(0, 6).join(" ");
+async function buildPexelsQuery(imagePrompt: string, concept: string, contentPillar: string): Promise<string> {
+  try {
+    const res = await fetch("/api/pexels-query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image_prompt: imagePrompt, concept, content_pillar: contentPillar }),
+    });
+    if (!res.ok) throw new Error("failed");
+    const data = await res.json();
+    return data.query || contentPillar;
+  } catch {
+    // Fallback to content pillar if Claude call fails
+    return contentPillar;
   }
-  if (!primaryQuery) {
-    const parts: string[] = [];
-    parts.push(concept.split(" ").slice(0, 4).join(" "));
-    if (brandDna?.aesthetic_direction) parts.push(brandDna.aesthetic_direction.split(" ").slice(0, 2).join(" "));
-    primaryQuery = parts.join(" ").trim();
+}
+
+async function fetchPexelsForConcept(concept: string, contentPillar: string, brandDna: Brand["brand_dna"], count: number = 1, imagePrompt?: string): Promise<string[]> {
+  let primaryQuery = contentPillar;
+  if (imagePrompt) {
+    primaryQuery = await buildPexelsQuery(imagePrompt, concept, contentPillar);
   }
   let urls = await fetchPexelsImages(primaryQuery, count);
   if (urls.length < count) {
