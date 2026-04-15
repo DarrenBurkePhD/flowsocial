@@ -16,6 +16,7 @@ type ContentPiece = {
   posting_time: string;
   status: string;
   image_url?: string;
+  carousel_urls?: string[];
   image_source?: "brand" | "unsplash" | "ai" | null;
   buffer_id?: string;
 };
@@ -56,57 +57,76 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-async function fetchPexelsForConcept(concept: string, contentPillar: string, brandDna: Brand["brand_dna"]): Promise<string | null> {
-  // Build a contextual query from the post concept + pillar + brand aesthetic
+async function fetchPexelsImages(query: string, count: number): Promise<string[]> {
+  try {
+    const res = await fetch(`/api/unsplash-search?query=${encodeURIComponent(query)}&count=${count * 2}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.photos || []).slice(0, count).map((p: { url: string }) => p.url);
+  } catch {
+    return [];
+  }
+}
+
+async function fetchPexelsForConcept(concept: string, contentPillar: string, brandDna: Brand["brand_dna"], count: number = 1): Promise<string[]> {
   const parts: string[] = [];
   parts.push(concept.split(" ").slice(0, 5).join(" "));
   if (brandDna?.aesthetic_direction) parts.push(brandDna.aesthetic_direction.split(" ").slice(0, 2).join(" "));
   const query = parts.join(" ").trim();
-
-  try {
-    const res = await fetch(`/api/unsplash-search?query=${encodeURIComponent(query)}&count=5`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data.photos?.length) {
-      // Fallback: try just the content pillar
-      const fallback = await fetch(`/api/unsplash-search?query=${encodeURIComponent(contentPillar)}&count=5`);
-      if (!fallback.ok) return null;
-      const fallbackData = await fallback.json();
-      if (!fallbackData.photos?.length) return null;
-      return fallbackData.photos[Math.floor(Math.random() * fallbackData.photos.length)].url;
-    }
-    return data.photos[Math.floor(Math.random() * data.photos.length)].url;
-  } catch {
-    return null;
+  let urls = await fetchPexelsImages(query, count);
+  if (urls.length < count) {
+    const fallback = await fetchPexelsImages(contentPillar, count - urls.length);
+    urls = [...urls, ...fallback];
   }
+  return urls;
 }
 
 async function assignImages(pieces: ContentPiece[], brandAssets: BrandAsset[], brandDna: Brand["brand_dna"]): Promise<ContentPiece[]> {
   const hasBrandAssets = brandAssets.length > 0;
   const shuffledAssets = shuffle([...brandAssets]);
   let assetIndex = 0;
-
   const result: ContentPiece[] = [];
 
   for (let i = 0; i < pieces.length; i++) {
     const piece = pieces[i];
-    // 60% brand assets if available, otherwise always stock
-    const useBrand = hasBrandAssets && Math.random() < 0.6 && assetIndex < shuffledAssets.length;
+    const isCarousel = piece.content_type === "carousel";
 
-    if (useBrand) {
+    if (isCarousel) {
+      // Carousels always get 3 contextual Pexels images
+      // Mix brand assets in if available
+      const carouselUrls: string[] = [];
+      const carouselSources: string[] = [];
+
+      for (let s = 0; s < 3; s++) {
+        const useBrand = hasBrandAssets && Math.random() < 0.6 && assetIndex < shuffledAssets.length;
+        if (useBrand) {
+          carouselUrls.push(shuffledAssets[assetIndex].public_url);
+          carouselSources.push("brand");
+          assetIndex++;
+        } else {
+          const urls = await fetchPexelsForConcept(piece.concept, piece.content_pillar, brandDna, 1);
+          if (urls.length) {
+            carouselUrls.push(urls[0]);
+            carouselSources.push("unsplash");
+          }
+        }
+      }
+
       result.push({
         ...piece,
-        image_url: shuffledAssets[assetIndex].public_url,
-        image_source: "brand",
+        image_url: carouselUrls[0] || undefined,
+        carousel_urls: carouselUrls.length > 0 ? carouselUrls : undefined,
+        image_source: (carouselSources[0] as "brand" | "unsplash") || null,
       });
-      assetIndex++;
     } else {
-      const url = await fetchPexelsForConcept(piece.concept, piece.content_pillar, brandDna);
-      result.push({
-        ...piece,
-        image_url: url || piece.image_url || undefined,
-        image_source: url ? "unsplash" : (piece.image_source || null),
-      });
+      const useBrand = hasBrandAssets && Math.random() < 0.6 && assetIndex < shuffledAssets.length;
+      if (useBrand) {
+        result.push({ ...piece, image_url: shuffledAssets[assetIndex].public_url, image_source: "brand" });
+        assetIndex++;
+      } else {
+        const urls = await fetchPexelsForConcept(piece.concept, piece.content_pillar, brandDna, 1);
+        result.push({ ...piece, image_url: urls[0] || piece.image_url || undefined, image_source: urls[0] ? "unsplash" : (piece.image_source || null) });
+      }
     }
   }
 
@@ -172,6 +192,48 @@ function ImageSourceLabel({ source }: { source?: "brand" | "unsplash" | "ai" | n
   return (
     <div style={{ fontSize: "9px", color: c.color, marginTop: "3px", textAlign: "center", letterSpacing: "0.2px" }}>
       {c.label}
+    </div>
+  );
+}
+
+function CarouselThumbs({ urls, loading, onRegen }: { urls: string[]; loading: boolean; onRegen: () => void }) {
+  const slots = [0, 1, 2];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+      <div style={{ display: "flex", gap: "3px", position: "relative" }}
+        onMouseEnter={(e) => { const o = e.currentTarget.querySelector(".carousel-regen") as HTMLElement; if (o) o.style.opacity = "1"; }}
+        onMouseLeave={(e) => { const o = e.currentTarget.querySelector(".carousel-regen") as HTMLElement; if (o) o.style.opacity = "0"; }}>
+        {slots.map((s) => (
+          <div key={s} style={{ width: "40px", height: "56px", borderRadius: s === 0 ? "6px 0 0 6px" : s === 2 ? "0 6px 6px 0" : "0", background: "#1A1A18", overflow: "hidden", position: "relative", flexShrink: 0 }}>
+            {loading ? (
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ fontSize: "8px", color: "#3A3835" }}>...</span>
+              </div>
+            ) : urls[s] ? (
+              <img src={urls[s]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ fontSize: "14px", color: "#2A2825" }}>+</span>
+              </div>
+            )}
+            {s === 1 && (
+              <div style={{ position: "absolute", top: "2px", right: "2px", width: "12px", height: "12px", borderRadius: "2px", background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ fontSize: "7px", color: "#9E9A93" }}>⊞</span>
+              </div>
+            )}
+          </div>
+        ))}
+        {/* Regen overlay */}
+        <div className="carousel-regen" style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", opacity: 0, transition: "opacity 0.2s" }} onClick={onRegen}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F0EDE6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+            <path d="M21 3v5h-5"/>
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+            <path d="M8 16H3v5"/>
+          </svg>
+        </div>
+      </div>
+      <div style={{ fontSize: "9px", color: "#4A4845", marginTop: "3px", textAlign: "center" }}>3 slides</div>
     </div>
   );
 }
@@ -259,6 +321,28 @@ export default function DashboardPage() {
     }
   }
 
+  async function regenerateCarousel(index: number) {
+    if (!contentPackage) return;
+    setGeneratingImages((prev) => [...prev, index]);
+    try {
+      const piece = contentPackage.content_pieces[index];
+      const urls = await fetchPexelsForConcept(piece.concept, piece.content_pillar, brand?.brand_dna, 3);
+      const updated = [...contentPackage.content_pieces];
+      updated[index] = {
+        ...updated[index],
+        image_url: urls[0] || updated[index].image_url,
+        carousel_urls: urls.length > 0 ? urls : updated[index].carousel_urls,
+        image_source: "unsplash",
+      };
+      setContentPackage({ ...contentPackage, content_pieces: updated });
+      await persistPieces(contentPackage.id, updated);
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : "Image refresh failed", "error");
+    } finally {
+      setGeneratingImages((prev) => prev.filter((i) => i !== index));
+    }
+  }
+
   async function generateImage(index: number) {
     if (!contentPackage) return;
     setGeneratingImages((prev) => [...prev, index]);
@@ -328,7 +412,7 @@ export default function DashboardPage() {
     if (!contentPackage || approvingIndex === index) return;
     const piece = contentPackage.content_pieces[index];
     if (piece.status !== "approved" && !piece.image_url) {
-      showMessage("Add an image first — Instagram requires one.", "error");
+      showMessage("Add images first — Instagram requires at least one.", "error");
       return;
     }
     setApprovingIndex(index);
@@ -351,10 +435,23 @@ ${piece.cta}
 
 ${cleanHashtags}`;
         const scheduledAt = Math.floor(new Date(`${piece.post_date}T${piece.posting_time}:00-03:00`).getTime() / 1000);
+
+        // For carousels send all image URLs, otherwise just the one
+        const imageUrl = piece.content_type === "carousel" && piece.carousel_urls?.length
+          ? piece.carousel_urls[0]
+          : piece.image_url || null;
+
         const res = await fetch("/api/push-single-to-buffer", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ profile_id: brand.buffer_profile_id, text: fullCaption, scheduled_at: scheduledAt, image_url: piece.image_url || null, content_type: piece.content_type }),
+          body: JSON.stringify({
+            profile_id: brand.buffer_profile_id,
+            text: fullCaption,
+            scheduled_at: scheduledAt,
+            image_url: imageUrl,
+            image_urls: piece.content_type === "carousel" ? piece.carousel_urls : undefined,
+            content_type: piece.content_type,
+          }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
@@ -391,6 +488,7 @@ ${cleanHashtags}`;
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
         .regen-btn { opacity: 0; transition: opacity 0.2s; }
         .img-wrap:hover .regen-btn { opacity: 1; }
+        .carousel-regen { opacity: 0; transition: opacity 0.2s; }
         .dash-nav { padding: 14px 20px; border-bottom: 0.5px solid rgba(240,237,230,0.08); }
         .dash-nav-inner { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .nav-logo-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -522,8 +620,10 @@ ${cleanHashtags}`;
                       ) : (
                         <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px" }}>
                           <span style={{ fontSize: "18px", color: "#2A2825" }}>+</span>
-                          <span style={{ fontSize: "8px", color: "#2A2825", textTransform: "uppercase", letterSpacing: "0.5px" }}>No image</span>
                         </div>
+                      )}
+                      {piece.content_type === "carousel" && (
+                        <div style={{ position: "absolute", top: "4px", left: "4px", background: "rgba(0,0,0,0.6)", borderRadius: "3px", padding: "1px 4px", fontSize: "7px", color: "#9E9A93" }}>⊞ 3</div>
                       )}
                       {piece.status === "approved" && (
                         <div style={{ position: "absolute", top: "4px", right: "4px", width: "16px", height: "16px", borderRadius: "50%", background: "rgba(34,197,94,0.9)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -542,95 +642,109 @@ ${cleanHashtags}`;
               </div>
             )}
 
-            {contentPackage.content_pieces.map((piece, index) => (
-              <div key={index} className="post-card" style={{ border: `0.5px solid ${piece.status === "approved" ? "rgba(196,168,130,0.3)" : "rgba(240,237,230,0.06)"}` }}>
-                <div className="post-card-inner">
-                  <div className="post-row">
-                    <div className="mobile-top-row">
-                      <div className="day-col">
-                        <div className="day-label">{weekDates[(piece.day - 1) % 7]?.day ?? ""}</div>
-                        <div className="day-num" style={{ color: piece.status === "approved" ? "#C4A882" : "#F0EDE6" }}>{weekDates[(piece.day - 1) % 7]?.date ?? piece.day}</div>
-                        <div className="day-month">{weekDates[(piece.day - 1) % 7]?.month ?? ""}</div>
-                        <div className="day-time">{piece.posting_time}</div>
-                      </div>
+            {contentPackage.content_pieces.map((piece, index) => {
+              const isCarousel = piece.content_type === "carousel";
+              const carouselUrls = piece.carousel_urls || (piece.image_url ? [piece.image_url] : []);
+              const hasImage = !!piece.image_url;
 
-                      <div className="img-col">
-                        <div className="img-thumb img-wrap">
-                          {generatingImages.includes(index) ? (
-                            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              <span style={{ fontSize: "10px", color: "#6B6760" }}>...</span>
+              return (
+                <div key={index} className="post-card" style={{ border: `0.5px solid ${piece.status === "approved" ? "rgba(196,168,130,0.3)" : "rgba(240,237,230,0.06)"}` }}>
+                  <div className="post-card-inner">
+                    <div className="post-row">
+                      <div className="mobile-top-row">
+                        <div className="day-col">
+                          <div className="day-label">{weekDates[(piece.day - 1) % 7]?.day ?? ""}</div>
+                          <div className="day-num" style={{ color: piece.status === "approved" ? "#C4A882" : "#F0EDE6" }}>{weekDates[(piece.day - 1) % 7]?.date ?? piece.day}</div>
+                          <div className="day-month">{weekDates[(piece.day - 1) % 7]?.month ?? ""}</div>
+                          <div className="day-time">{piece.posting_time}</div>
+                        </div>
+
+                        {isCarousel ? (
+                          <CarouselThumbs
+                            urls={carouselUrls}
+                            loading={generatingImages.includes(index)}
+                            onRegen={() => regenerateCarousel(index)}
+                          />
+                        ) : (
+                          <div className="img-col">
+                            <div className="img-thumb img-wrap">
+                              {generatingImages.includes(index) ? (
+                                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                  <span style={{ fontSize: "10px", color: "#6B6760" }}>...</span>
+                                </div>
+                              ) : piece.image_url ? (
+                                <>
+                                  <img src={piece.image_url} alt={piece.concept} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                  <div className="regen-btn" style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} onClick={() => generateImage(index)}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F0EDE6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                                      <path d="M21 3v5h-5"/>
+                                      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                                      <path d="M8 16H3v5"/>
+                                    </svg>
+                                  </div>
+                                </>
+                              ) : (
+                                <button onClick={() => generateImage(index)} style={{ width: "100%", height: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", color: "#3A3835" }}>
+                                  <span style={{ fontSize: "16px" }}>+</span>
+                                  <span style={{ fontSize: "8px", letterSpacing: "0.5px" }}>IMAGE</span>
+                                </button>
+                              )}
                             </div>
-                          ) : piece.image_url ? (
-                            <>
-                              <img src={piece.image_url} alt={piece.concept} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                              <div className="regen-btn" style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} onClick={() => generateImage(index)}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F0EDE6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-                                  <path d="M21 3v5h-5"/>
-                                  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-                                  <path d="M8 16H3v5"/>
-                                </svg>
-                              </div>
-                            </>
-                          ) : (
-                            <button onClick={() => generateImage(index)} style={{ width: "100%", height: "100%", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", color: "#3A3835" }}>
-                              <span style={{ fontSize: "16px" }}>+</span>
-                              <span style={{ fontSize: "8px", letterSpacing: "0.5px" }}>IMAGE</span>
-                            </button>
-                          )}
-                        </div>
-                        <ImageSourceLabel source={piece.image_source} />
-                      </div>
-                    </div>
-
-                    <div className="content-col">
-                      <div className="content-tags">
-                        <span className="content-tag">{piece.content_type.replace("_", " ")}</span>
-                        <span className="content-tag">{piece.content_pillar}</span>
-                      </div>
-                      <p className="content-concept">{piece.concept}</p>
-                      {selectedPiece === index ? (
-                        <div>
-                          <textarea value={editingCaption} onChange={(e) => setEditingCaption(e.target.value)} rows={5}
-                            style={{ width: "100%", background: "#0A0A0A", border: "0.5px solid rgba(240,237,230,0.15)", borderRadius: "8px", padding: "10px 12px", fontSize: "13px", color: "#F0EDE6", outline: "none", resize: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-                          <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
-                            <button onClick={() => saveCaption(index)} style={{ fontSize: "12px", background: "#F0EDE6", color: "#0A0A0A", border: "none", borderRadius: "100px", padding: "7px 16px", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>Save</button>
-                            <button onClick={() => regenerateCaption(index)} disabled={regeneratingCaptions.includes(index)}
-                              style={{ fontSize: "12px", background: "transparent", color: "#C4A882", border: "0.5px solid rgba(196,168,130,0.3)", borderRadius: "100px", padding: "7px 16px", cursor: regeneratingCaptions.includes(index) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: regeneratingCaptions.includes(index) ? 0.5 : 1 }}>
-                              {regeneratingCaptions.includes(index) ? "Rewriting..." : "Regenerate"}
-                            </button>
-                            <button onClick={() => setSelectedPiece(null)} style={{ fontSize: "12px", background: "transparent", color: "#6B6760", border: "0.5px solid rgba(240,237,230,0.15)", borderRadius: "100px", padding: "7px 14px", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                            <ImageSourceLabel source={piece.image_source} />
                           </div>
-                        </div>
-                      ) : (
-                        <p className="content-caption" onClick={() => { setSelectedPiece(index); setEditingCaption(piece.caption); }}>{piece.caption}</p>
-                      )}
-                      <p className="content-hashtags">
-                        {piece.hashtags.slice(0, 3).map((h) => `#${h.replace(/#/g, "")}`).join(" ")}
-                        {piece.hashtags.length > 3 && ` +${piece.hashtags.length - 3}`}
-                      </p>
-                    </div>
+                        )}
+                      </div>
 
-                    <div className="action-col">
-                      {piece.status === "approved" ? (
-                        <button onClick={() => toggleApprove(index)} disabled={approvingIndex === index} className="btn-scheduled">
-                          <div>✓ Scheduled</div>
-                          <div style={{ fontSize: "9px", opacity: 0.7, marginTop: "1px" }}>{formatScheduledTime(piece.post_date, piece.posting_time)}</div>
-                        </button>
-                      ) : !piece.image_url ? (
-                        <button onClick={() => generateImage(index)} disabled={generatingImages.includes(index)} className="btn-add-image">
-                          {generatingImages.includes(index) ? "..." : "+ Add image"}
-                        </button>
-                      ) : (
-                        <button onClick={() => toggleApprove(index)} disabled={approvingIndex === index} className="btn-approve">
-                          {approvingIndex === index ? "..." : "Approve →"}
-                        </button>
-                      )}
+                      <div className="content-col">
+                        <div className="content-tags">
+                          <span className="content-tag">{piece.content_type.replace("_", " ")}</span>
+                          <span className="content-tag">{piece.content_pillar}</span>
+                        </div>
+                        <p className="content-concept">{piece.concept}</p>
+                        {selectedPiece === index ? (
+                          <div>
+                            <textarea value={editingCaption} onChange={(e) => setEditingCaption(e.target.value)} rows={5}
+                              style={{ width: "100%", background: "#0A0A0A", border: "0.5px solid rgba(240,237,230,0.15)", borderRadius: "8px", padding: "10px 12px", fontSize: "13px", color: "#F0EDE6", outline: "none", resize: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                            <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
+                              <button onClick={() => saveCaption(index)} style={{ fontSize: "12px", background: "#F0EDE6", color: "#0A0A0A", border: "none", borderRadius: "100px", padding: "7px 16px", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>Save</button>
+                              <button onClick={() => regenerateCaption(index)} disabled={regeneratingCaptions.includes(index)}
+                                style={{ fontSize: "12px", background: "transparent", color: "#C4A882", border: "0.5px solid rgba(196,168,130,0.3)", borderRadius: "100px", padding: "7px 16px", cursor: regeneratingCaptions.includes(index) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: regeneratingCaptions.includes(index) ? 0.5 : 1 }}>
+                                {regeneratingCaptions.includes(index) ? "Rewriting..." : "Regenerate"}
+                              </button>
+                              <button onClick={() => setSelectedPiece(null)} style={{ fontSize: "12px", background: "transparent", color: "#6B6760", border: "0.5px solid rgba(240,237,230,0.15)", borderRadius: "100px", padding: "7px 14px", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="content-caption" onClick={() => { setSelectedPiece(index); setEditingCaption(piece.caption); }}>{piece.caption}</p>
+                        )}
+                        <p className="content-hashtags">
+                          {piece.hashtags.slice(0, 3).map((h) => `#${h.replace(/#/g, "")}`).join(" ")}
+                          {piece.hashtags.length > 3 && ` +${piece.hashtags.length - 3}`}
+                        </p>
+                      </div>
+
+                      <div className="action-col">
+                        {piece.status === "approved" ? (
+                          <button onClick={() => toggleApprove(index)} disabled={approvingIndex === index} className="btn-scheduled">
+                            <div>✓ Scheduled</div>
+                            <div style={{ fontSize: "9px", opacity: 0.7, marginTop: "1px" }}>{formatScheduledTime(piece.post_date, piece.posting_time)}</div>
+                          </button>
+                        ) : !hasImage ? (
+                          <button onClick={() => isCarousel ? regenerateCarousel(index) : generateImage(index)} disabled={generatingImages.includes(index)} className="btn-add-image">
+                            {generatingImages.includes(index) ? "..." : "+ Add images"}
+                          </button>
+                        ) : (
+                          <button onClick={() => toggleApprove(index)} disabled={approvingIndex === index} className="btn-approve">
+                            {approvingIndex === index ? "..." : "Approve →"}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {weekLocked && (
               <div style={{ textAlign: "center", paddingTop: "24px", paddingBottom: "8px" }}>

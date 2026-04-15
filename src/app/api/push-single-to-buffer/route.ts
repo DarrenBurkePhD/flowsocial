@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const { profile_id, text, scheduled_at, image_url, content_type } = await req.json();
+    const { profile_id, text, scheduled_at, image_url, image_urls, content_type } = await req.json();
 
     if (!image_url) {
       return NextResponse.json(
@@ -14,6 +14,11 @@ export async function POST(req: NextRequest) {
     const dueAt = new Date(scheduled_at * 1000).toISOString();
     const instagramType = content_type === "story" ? "story" : "post";
 
+    // For carousels use all URLs, otherwise just the one
+    const imageArray = content_type === "carousel" && image_urls?.length
+      ? image_urls.map((url: string) => `{ url: ${JSON.stringify(url)} }`).join(", ")
+      : `{ url: ${JSON.stringify(image_url)} }`;
+
     const mutation = `
       mutation CreatePost {
         createPost(input: {
@@ -24,7 +29,7 @@ export async function POST(req: NextRequest) {
           dueAt: "${dueAt}",
           assets: {
             images: [
-              { url: ${JSON.stringify(image_url)} }
+              ${imageArray}
             ]
           },
           metadata: {
