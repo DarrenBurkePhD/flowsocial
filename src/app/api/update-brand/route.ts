@@ -10,7 +10,6 @@ const supabaseAdmin = createSupabaseAdmin(
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -20,7 +19,8 @@ export async function POST(req: NextRequest) {
     const {
       brand_id, brand_name, brand_description, website_url,
       buffer_profile_id, brand_voice, age_range, gender,
-      psychographics, image_color, image_people, image_finish, logo_url,
+      psychographics, image_color, image_people, image_finish,
+      logo_url, visual_identity,
     } = body;
 
     const { data: existing } = await supabaseAdmin
@@ -51,7 +51,10 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    if (image_color !== undefined || image_people !== undefined || image_finish !== undefined) {
+    if (
+      image_color !== undefined || image_people !== undefined ||
+      image_finish !== undefined || visual_identity !== undefined
+    ) {
       const currentDna = existing.brand_dna || {};
       updates.brand_dna = {
         ...currentDna,
@@ -61,6 +64,7 @@ export async function POST(req: NextRequest) {
           ...(image_people !== undefined && { people: image_people }),
           ...(image_finish !== undefined && { finish: image_finish }),
         },
+        ...(visual_identity !== undefined && { visual_identity }),
       };
     }
 
@@ -72,7 +76,6 @@ export async function POST(req: NextRequest) {
 
     if (error) throw new Error(error.message);
     return NextResponse.json({ success: true });
-
   } catch (err: unknown) {
     console.error("Update brand error:", err);
     return NextResponse.json(

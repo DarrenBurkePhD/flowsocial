@@ -110,6 +110,7 @@ export default function SettingsPage() {
     image_color: "full_color",
     image_people: "mix",
     image_finish: "clean_clinical",
+    visual_identity: "",
   });
 
   useEffect(() => {
@@ -170,6 +171,7 @@ export default function SettingsPage() {
           image_color: b.brand_dna?.image_preferences?.color || "full_color",
           image_people: b.brand_dna?.image_preferences?.people || "mix",
           image_finish: b.brand_dna?.image_preferences?.finish || "clean_clinical",
+          visual_identity: (b.brand_dna as any)?.visual_identity || "",
         });
         setLogoUrl(data.brand.logo_url || "");
       }
@@ -522,6 +524,23 @@ export default function SettingsPage() {
               {FINISH_OPTIONS.map((o) => (
                 <ImageOptionCard key={o.id} label={o.label} desc={o.desc} selected={form.image_finish === o.id} onClick={() => updateField("image_finish", o.id)} />
               ))}
+            </div>
+
+            <div style={{ background: "#111111", border: "0.5px solid rgba(240,237,230,0.06)", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", gap: "12px" }}>
+              <h3 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "18px", color: "#F0EDE6", margin: 0 }}>Visual identity</h3>
+              <p style={{ fontSize: "13px", color: "#6B6760", margin: 0, lineHeight: 1.6 }}>
+                Describe your brand's visual world in your own words. The more specific you are, the better your images will match your content. Include sports, settings, mood, and the type of people you want to show.
+              </p>
+              <p style={{ fontSize: "11px", color: "#4A4845", margin: 0, lineHeight: 1.6 }}>
+                Example: "Dark and gritty contact sport photography. Male athletes aged 18-35. Rugby, MMA, football, hockey. Locker rooms, training fields, weight rooms. Raw intensity, not polished fitness."
+              </p>
+              <textarea
+                value={form.visual_identity}
+                onChange={(e) => updateField("visual_identity", e.target.value)}
+                rows={4}
+                placeholder="Describe your brand's visual world..."
+                style={{ width: "100%", background: "#0A0A0A", border: "0.5px solid rgba(240,237,230,0.15)", borderRadius: "8px", padding: "12px 16px", fontSize: "14px", color: "#F0EDE6", outline: "none", boxSizing: "border-box" as const, fontFamily: "inherit", resize: "none" }}
+              />
             </div>
           </div>
         )}

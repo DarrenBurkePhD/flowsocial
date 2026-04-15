@@ -13,9 +13,11 @@ export async function POST(req: NextRequest) {
       products,
       content_pillars,
       image_preferences,
+      visual_identity,
     } = await req.json();
 
     const brandContext = [
+      visual_identity ? `Visual identity: ${visual_identity}` : "",
       aesthetic_direction ? `Brand aesthetic: ${aesthetic_direction}` : "",
       products?.length ? `Products: ${products.slice(0, 3).join(", ")}` : "",
       content_pillars?.length ? `Content pillars: ${content_pillars.slice(0, 3).join(", ")}` : "",
@@ -41,9 +43,9 @@ Content pillar: ${content_pillar}
 RULES:
 - Return ONLY the search query, nothing else, no punctuation
 - Use concrete visual nouns and action words specific to this brand's world
+- The visual identity description above is the most important context — follow it closely
 - Match the brand aesthetic and the specific sport/lifestyle context
 - Prioritize the type of people, setting, and mood that fits this brand
-- Avoid generic fitness cliches unless they match the brand aesthetic
 - Never return abstract or negative imagery words
 - Think: what would THIS brand's photographer specifically shoot for this post?
 

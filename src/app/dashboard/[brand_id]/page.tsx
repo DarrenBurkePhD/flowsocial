@@ -81,6 +81,7 @@ async function buildPexelsQuery(imagePrompt: string, concept: string, contentPil
         products: brandDna?.products || [],
         content_pillars: brandDna?.content_pillars || [],
         image_preferences: brandDna?.image_preferences || {},
+        visual_identity: (brandDna as any)?.visual_identity || "",
       }),
     });
     if (!res.ok) throw new Error("failed");

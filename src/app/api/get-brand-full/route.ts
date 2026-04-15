@@ -5,13 +5,11 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const brand_id = searchParams.get("brand_id");
-
     if (!brand_id) {
       return NextResponse.json({ error: "brand_id required" }, { status: 400 });
     }
 
     const supabase = await createClient();
-
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -26,7 +24,6 @@ export async function GET(req: NextRequest) {
 
     if (error) throw new Error(error.message);
     return NextResponse.json({ brand });
-
   } catch (err: unknown) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Something went wrong" },
