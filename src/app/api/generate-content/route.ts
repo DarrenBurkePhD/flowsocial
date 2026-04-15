@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     const hashtagStrategy = brand.hashtag_strategy || {};
     const ctaLibrary = brandDna.cta_library || [];
     const targetAudience = brand.target_audience || {};
+    const keyMessages = brandDna.key_messages || "";
 
     const today = new Date();
     const weekDates = Array.from({ length: 7 }, (_, i) => {
@@ -54,7 +55,8 @@ CONTENT PILLARS: ${contentPillars.join(", ")}
 TONE GUIDELINES: ${toneGuidelines}
 IMAGE STYLE: ${imageStyle}
 HASHTAG STRATEGY: ${JSON.stringify(hashtagStrategy)}
-CTA LIBRARY: ${ctaLibrary.join(", ")}
+CTA LIBRARY: ${ctaLibrary.join(", ")}${keyMessages ? `
+KEY MESSAGES AND SLOGANS: ${keyMessages}` : ""}
 
 WEEK DATES: ${weekDates.join(", ")}
 
@@ -71,6 +73,7 @@ CAPTION RULES:
 - No em dashes anywhere
 - Write like a human founder, not a marketing team
 - Be specific to the brand and audience, never generic
+- Where relevant, echo the brand's key messages and slogans naturally — do not force them but let them shape the tone and language
 
 Return ONLY a valid JSON array of exactly 7 objects with this structure:
 [

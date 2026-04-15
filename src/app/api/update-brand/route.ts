@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       brand_id, brand_name, brand_description, website_url,
       buffer_profile_id, brand_voice, age_range, gender,
       psychographics, image_color, image_people, image_finish,
-      logo_url, visual_identity,
+      logo_url, visual_identity, key_messages,
     } = body;
 
     const { data: existing } = await supabaseAdmin
@@ -53,7 +53,8 @@ export async function POST(req: NextRequest) {
 
     if (
       image_color !== undefined || image_people !== undefined ||
-      image_finish !== undefined || visual_identity !== undefined
+      image_finish !== undefined || visual_identity !== undefined ||
+      key_messages !== undefined
     ) {
       const currentDna = existing.brand_dna || {};
       updates.brand_dna = {
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
           ...(image_finish !== undefined && { finish: image_finish }),
         },
         ...(visual_identity !== undefined && { visual_identity }),
+        ...(key_messages !== undefined && { key_messages }),
       };
     }
 

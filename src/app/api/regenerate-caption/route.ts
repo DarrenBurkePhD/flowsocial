@@ -21,18 +21,18 @@ export async function POST(request: NextRequest) {
 
     if (!brand) return NextResponse.json({ error: "Brand not found" }, { status: 404 });
 
-    const prompt = `You are writing Instagram captions for ${brand.brand_name}.
+    const keyMessages = brand.brand_dna?.key_messages || "";
 
+    const prompt = `You are writing Instagram captions for ${brand.brand_name}.
 Brand description: ${brand.brand_description}
-Brand DNA: ${JSON.stringify(brand.brand_dna)}
+Brand DNA: ${JSON.stringify(brand.brand_dna)}${keyMessages ? `
+Key messages and slogans: ${keyMessages}` : ""}
 
 Write a NEW caption for this post. It must be different from the current one.
-
 Post concept: ${concept}
 Content type: ${content_type}
 Content pillar: ${content_pillar}
 CTA to include: ${cta}
-
 Current caption (do NOT repeat this): ${current_caption}
 
 Rules:
@@ -42,6 +42,7 @@ Rules:
 - No em dashes
 - No hashtags in the caption body
 - End with the CTA naturally woven in
+- Where relevant, echo the brand's key messages and slogans naturally
 
 Return only the caption text, nothing else.`;
 

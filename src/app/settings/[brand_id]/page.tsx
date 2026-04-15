@@ -111,6 +111,7 @@ export default function SettingsPage() {
     image_people: "mix",
     image_finish: "clean_clinical",
     visual_identity: "",
+    key_messages: "",
   });
 
   useEffect(() => {
@@ -172,6 +173,7 @@ export default function SettingsPage() {
           image_people: b.brand_dna?.image_preferences?.people || "mix",
           image_finish: b.brand_dna?.image_preferences?.finish || "clean_clinical",
           visual_identity: (b.brand_dna as any)?.visual_identity || "",
+          key_messages: (b.brand_dna as any)?.key_messages || "",
         });
         setLogoUrl(data.brand.logo_url || "");
       }
@@ -400,6 +402,13 @@ export default function SettingsPage() {
               <div>
                 <label style={labelStyle}>What does your brand do?</label>
                 <textarea value={form.brand_description} onChange={(e) => updateField("brand_description", e.target.value)} rows={3} style={{ ...inputStyle, resize: "none" }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Key messages and slogans</label>
+                <textarea value={form.key_messages} onChange={(e) => updateField("key_messages", e.target.value)} rows={3}
+                  placeholder="e.g. Protect your brain. Elevate your game. Every hit you take costs you. We're here to give it back."
+                  style={{ ...inputStyle, resize: "none" }} />
+                <p style={{ fontSize: "11px", color: "#4A4845", marginTop: "4px" }}>These phrases will echo through your captions and CTAs. Add your taglines, slogans, and core brand statements.</p>
               </div>
               <div>
                 <label style={labelStyle}>Website URL</label>
