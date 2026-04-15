@@ -64,6 +64,8 @@ type Brand = {
   };
 };
 
+type SubStatus = "active" | "trialing" | "canceled" | "none";
+
 function ImageOptionCard({ label, desc, selected, onClick }: { label: string; desc: string; selected: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{ background: selected ? "rgba(196,168,130,0.1)" : "transparent", border: `0.5px solid ${selected ? "#C4A882" : "rgba(240,237,230,0.1)"}`, borderRadius: "10px", padding: "12px 16px", cursor: "pointer", fontFamily: "inherit", textAlign: "left", width: "100%", transition: "all 0.15s" }}>
@@ -86,6 +88,9 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<"brand" | "audience" | "images" | "assets">("brand");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoUrl, setLogoUrl] = useState("");
+  const [subStatus, setSubStatus] = useState<SubStatus>("none");
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+  const [openingPortal, setOpeningPortal] = useState(false);
 
   const [assets, setAssets] = useState<BrandAsset[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(false);
@@ -109,6 +114,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadBrand();
+    loadSubStatus();
   }, [brand_id]);
 
   useEffect(() => {
@@ -116,6 +122,35 @@ export default function SettingsPage() {
       loadAssets();
     }
   }, [activeTab]);
+
+  async function loadSubStatus() {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from("subscriptions")
+      .select("status, trial_ends_at, current_period_ends_at")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (data) {
+      setSubStatus(data.status as SubStatus);
+      if (data.trial_ends_at) setTrialEndsAt(data.trial_ends_at);
+    }
+  }
+
+  async function handleOpenPortal() {
+    setOpeningPortal(true);
+    try {
+      const res = await fetch(`/api/stripe/portal?brand_id=${brand_id}`, { method: "POST" });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else showMessage("Could not open billing portal", "error");
+    } catch {
+      showMessage("Could not open billing portal", "error");
+    } finally {
+      setOpeningPortal(false);
+    }
+  }
 
   async function loadBrand() {
     try {
@@ -168,9 +203,7 @@ export default function SettingsPage() {
       for (const file of validFiles) {
         const ext = file.name.split(".").pop();
         const fileName = `brand_assets/${brand_id}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
-        const { error: uploadError } = await supabase.storage
-          .from("media")
-          .upload(fileName, file, { upsert: false });
+        const { error: uploadError } = await supabase.storage.from("media").upload(fileName, file, { upsert: false });
         if (uploadError) { console.error("Upload error:", uploadError); continue; }
         const { data: urlData } = supabase.storage.from("media").getPublicUrl(fileName);
         const res = await fetch("/api/save-brand-asset", {
@@ -294,6 +327,11 @@ export default function SettingsPage() {
   const tabActive = { background: "rgba(196,168,130,0.1)", color: "#C4A882", border: "0.5px solid rgba(196,168,130,0.3)", borderRadius: "8px", padding: "8px 16px", fontSize: "13px", fontWeight: 500, cursor: "pointer" as const, fontFamily: "inherit" };
   const tabInactive = { background: "transparent", color: "#6B6760", border: "0.5px solid transparent", borderRadius: "8px", padding: "8px 16px", fontSize: "13px", cursor: "pointer" as const, fontFamily: "inherit" };
 
+  const subLabel = subStatus === "active" ? { text: "Active", color: "#4ADE80", bg: "rgba(34,197,94,0.08)", border: "rgba(34,197,94,0.25)" }
+    : subStatus === "trialing" ? { text: "Free trial", color: "#C4A882", bg: "rgba(196,168,130,0.08)", border: "rgba(196,168,130,0.25)" }
+    : subStatus === "canceled" ? { text: "Canceled", color: "#FCA5A5", bg: "rgba(220,38,38,0.08)", border: "rgba(220,38,38,0.25)" }
+    : null;
+
   if (loading) {
     return (
       <main style={{ minHeight: "100vh", background: "#0A0A0A", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -371,6 +409,7 @@ export default function SettingsPage() {
                 <p style={{ fontSize: "11px", color: "#4A4845", marginTop: "4px" }}>Find this in your Buffer URL: buffer.com/channels/YOUR-ID/schedule</p>
               </div>
             </div>
+
             <div style={{ background: "#111111", border: "0.5px solid rgba(240,237,230,0.06)", borderRadius: "12px", padding: "24px", display: "flex", flexDirection: "column", gap: "12px" }}>
               <h3 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "18px", color: "#F0EDE6", margin: 0 }}>Brand voice</h3>
               <p style={{ fontSize: "13px", color: "#6B6760", margin: 0 }}>Pick up to 3 tones that shape how your captions are written.</p>
@@ -383,6 +422,7 @@ export default function SettingsPage() {
                 ))}
               </div>
             </div>
+
             <div style={{ background: "rgba(196,168,130,0.06)", border: "0.5px solid rgba(196,168,130,0.2)", borderRadius: "12px", padding: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
               <div>
                 <div style={{ fontSize: "14px", fontWeight: 500, color: "#C4A882", marginBottom: "4px" }}>Regenerate brand DNA</div>
@@ -392,6 +432,44 @@ export default function SettingsPage() {
                 style={{ background: regenerating ? "#1E1E1C" : "transparent", color: regenerating ? "#4A4845" : "#C4A882", border: "0.5px solid rgba(196,168,130,0.4)", borderRadius: "100px", padding: "10px 20px", fontSize: "13px", fontWeight: 500, cursor: regenerating ? "not-allowed" : "pointer", fontFamily: "inherit", whiteSpace: "nowrap" as const }}>
                 {regenerating ? "Regenerating..." : "Regenerate →"}
               </button>
+            </div>
+
+            {/* Billing section */}
+            <div style={{ background: "#111111", border: "0.5px solid rgba(240,237,230,0.06)", borderRadius: "12px", padding: "24px" }}>
+              <h3 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "18px", color: "#F0EDE6", margin: "0 0 16px" }}>Billing</h3>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+                    <span style={{ fontSize: "14px", color: "#9E9A93" }}>Flow Social Pro</span>
+                    {subLabel && (
+                      <span style={{ fontSize: "11px", fontWeight: 500, color: subLabel.color, background: subLabel.bg, border: `0.5px solid ${subLabel.border}`, borderRadius: "100px", padding: "2px 8px" }}>
+                        {subLabel.text}
+                      </span>
+                    )}
+                  </div>
+                  {subStatus === "trialing" && trialEndsAt && (
+                    <div style={{ fontSize: "12px", color: "#4A4845" }}>
+                      Trial ends {new Date(trialEndsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </div>
+                  )}
+                  {subStatus === "none" && (
+                    <div style={{ fontSize: "12px", color: "#4A4845" }}>No active subscription</div>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                  {subStatus === "active" || subStatus === "trialing" ? (
+                    <button onClick={handleOpenPortal} disabled={openingPortal}
+                      style={{ background: "transparent", color: openingPortal ? "#4A4845" : "#9E9A93", border: "0.5px solid rgba(240,237,230,0.15)", borderRadius: "100px", padding: "8px 16px", fontSize: "12px", cursor: openingPortal ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                      {openingPortal ? "Opening..." : "Manage subscription"}
+                    </button>
+                  ) : (
+                    <button onClick={() => router.push("/upgrade")}
+                      style={{ background: "#C4A882", color: "#0A0A0A", border: "none", borderRadius: "100px", padding: "8px 16px", fontSize: "12px", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                      Upgrade now
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -463,7 +541,6 @@ export default function SettingsPage() {
                 <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: "none" }} disabled={uploadingLogo} />
               </label>
             </div>
-
             <div style={{ background: "#111111", border: "0.5px solid rgba(240,237,230,0.06)", borderRadius: "12px", padding: "24px" }}>
               <h3 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "18px", color: "#F0EDE6", margin: "0 0 6px" }}>Brand image library</h3>
               <p style={{ fontSize: "13px", color: "#6B6760", margin: "0 0 20px", lineHeight: 1.6 }}>
