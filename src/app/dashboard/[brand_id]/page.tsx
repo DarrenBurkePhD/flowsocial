@@ -68,12 +68,26 @@ async function fetchPexelsImages(query: string, count: number): Promise<string[]
   }
 }
 
-async function fetchPexelsForConcept(concept: string, contentPillar: string, brandDna: Brand["brand_dna"], count: number = 1): Promise<string[]> {
-  const parts: string[] = [];
-  parts.push(concept.split(" ").slice(0, 5).join(" "));
-  if (brandDna?.aesthetic_direction) parts.push(brandDna.aesthetic_direction.split(" ").slice(0, 2).join(" "));
-  const query = parts.join(" ").trim();
-  let urls = await fetchPexelsImages(query, count);
+async function fetchPexelsForConcept(concept: string, contentPillar: string, brandDna: Brand["brand_dna"], count: number = 1, imagePrompt?: string): Promise<string[]> {
+  // Use image_prompt as primary query — it is written to describe the visual scene
+  // Fall back to concept words + aesthetic direction if no prompt available
+  let primaryQuery = "";
+  if (imagePrompt) {
+    // Strip "no product packaging" type instructions, take first 6 meaningful words
+    const cleaned = imagePrompt
+      .replace(/no product packaging.*$/i, "")
+      .replace(/never include.*$/i, "")
+      .replace(/avoid.*$/i, "")
+      .trim();
+    primaryQuery = cleaned.split(/[,.]/).slice(0, 2).join(" ").trim().split(" ").slice(0, 6).join(" ");
+  }
+  if (!primaryQuery) {
+    const parts: string[] = [];
+    parts.push(concept.split(" ").slice(0, 4).join(" "));
+    if (brandDna?.aesthetic_direction) parts.push(brandDna.aesthetic_direction.split(" ").slice(0, 2).join(" "));
+    primaryQuery = parts.join(" ").trim();
+  }
+  let urls = await fetchPexelsImages(primaryQuery, count);
   if (urls.length < count) {
     const fallback = await fetchPexelsImages(contentPillar, count - urls.length);
     urls = [...urls, ...fallback];
@@ -104,7 +118,7 @@ async function assignImages(pieces: ContentPiece[], brandAssets: BrandAsset[], b
           carouselSources.push("brand");
           assetIndex++;
         } else {
-          const urls = await fetchPexelsForConcept(piece.concept, piece.content_pillar, brandDna, 1);
+          const urls = await fetchPexelsForConcept(piece.concept, piece.content_pillar, brandDna, 1, piece.image_prompt);
           if (urls.length) {
             carouselUrls.push(urls[0]);
             carouselSources.push("unsplash");
@@ -124,7 +138,7 @@ async function assignImages(pieces: ContentPiece[], brandAssets: BrandAsset[], b
         result.push({ ...piece, image_url: shuffledAssets[assetIndex].public_url, image_source: "brand" });
         assetIndex++;
       } else {
-        const urls = await fetchPexelsForConcept(piece.concept, piece.content_pillar, brandDna, 1);
+        const urls = await fetchPexelsForConcept(piece.concept, piece.content_pillar, brandDna, 1, piece.image_prompt);
         result.push({ ...piece, image_url: urls[0] || piece.image_url || undefined, image_source: urls[0] ? "unsplash" : (piece.image_source || null) });
       }
     }
@@ -326,7 +340,7 @@ export default function DashboardPage() {
     setGeneratingImages((prev) => [...prev, index]);
     try {
       const piece = contentPackage.content_pieces[index];
-      const urls = await fetchPexelsForConcept(piece.concept, piece.content_pillar, brand?.brand_dna, 3);
+      const urls = await fetchPexelsForConcept(piece.concept, piece.content_pillar, brand?.brand_dna, 3, piece.image_prompt);
       const updated = [...contentPackage.content_pieces];
       updated[index] = {
         ...updated[index],
