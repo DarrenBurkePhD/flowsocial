@@ -68,18 +68,25 @@ async function fetchPexelsImages(query: string, count: number): Promise<string[]
   }
 }
 
-async function buildPexelsQuery(imagePrompt: string, concept: string, contentPillar: string): Promise<string> {
+async function buildPexelsQuery(imagePrompt: string, concept: string, contentPillar: string, brandDna: Brand["brand_dna"]): Promise<string> {
   try {
     const res = await fetch("/api/pexels-query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image_prompt: imagePrompt, concept, content_pillar: contentPillar }),
+      body: JSON.stringify({
+        image_prompt: imagePrompt,
+        concept,
+        content_pillar: contentPillar,
+        aesthetic_direction: brandDna?.aesthetic_direction || "",
+        products: brandDna?.products || [],
+        content_pillars: brandDna?.content_pillars || [],
+        image_preferences: brandDna?.image_preferences || {},
+      }),
     });
     if (!res.ok) throw new Error("failed");
     const data = await res.json();
     return data.query || contentPillar;
   } catch {
-    // Fallback to content pillar if Claude call fails
     return contentPillar;
   }
 }
@@ -87,7 +94,7 @@ async function buildPexelsQuery(imagePrompt: string, concept: string, contentPil
 async function fetchPexelsForConcept(concept: string, contentPillar: string, brandDna: Brand["brand_dna"], count: number = 1, imagePrompt?: string): Promise<string[]> {
   let primaryQuery = contentPillar;
   if (imagePrompt) {
-    primaryQuery = await buildPexelsQuery(imagePrompt, concept, contentPillar);
+    primaryQuery = await buildPexelsQuery(imagePrompt, concept, contentPillar, brandDna);
   }
   let urls = await fetchPexelsImages(primaryQuery, count);
   if (urls.length < count) {
