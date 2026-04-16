@@ -70,7 +70,7 @@ export default function Home() {
           <em style={{ fontStyle: "italic", color: "#C4A882" }}>is over.</em>
         </h1>
         <p style={{ fontSize: "18px", fontWeight: 300, color: "#9E9A93", lineHeight: 1.7, maxWidth: "600px", margin: "28px 0 0" }}>
-          Flow Social is the AI brand engine that replaces your social media agency. Strategy, content, images, captions, hashtags — generated in seconds, scheduled automatically, on-brand every time. Built for founders who are done paying big agency fees for mediocre content.
+          Flow Social is the AI brand engine that replaces your social media agency. Strategy, content, images, captions, hashtags — generated in seconds, scheduled automatically, on-brand every time. Built for founders who are done paying big fees for mediocre content.
         </p>
       </div>
 
