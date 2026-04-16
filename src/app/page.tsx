@@ -70,7 +70,7 @@ export default function Home() {
           <em style={{ fontStyle: "italic", color: "#C4A882" }}>is over.</em>
         </h1>
         <p style={{ fontSize: "18px", fontWeight: 300, color: "#9E9A93", lineHeight: 1.7, maxWidth: "600px", margin: "28px 0 0" }}>
-          Flow Social is the AI brand engine that replaces your social media agency. Strategy, content, images, captions, hashtags — generated in seconds, scheduled automatically, on-brand every time. Built for consumer product founders who are done paying $3,000 a month for mediocre content.
+          Flow Social is the AI brand engine that replaces your social media agency. Strategy, content, images, captions, hashtags — generated in seconds, scheduled automatically, on-brand every time. Built for founders who are done paying big agency fees for mediocre content.
         </p>
       </div>
 
@@ -102,7 +102,7 @@ export default function Home() {
             {
               num: "01",
               title: "$2,000–$8,000/month retainers",
-              desc: "For content that takes a junior account manager 3 hours to produce. You're paying for overhead, not output. And you're locked in for 6 months before you realize it."
+              desc: "For content that takes a junior account manager 3 hours to produce. You're paying for overhead, not output. And you're locked in for 6-12 months."
             },
             {
               num: "02",
@@ -173,7 +173,7 @@ export default function Home() {
               "We went from posting twice a month to every single day — with content that actually sounds like us. No agency, no freelancer, no brief. Just Flow Social."
             </div>
             <div style={{ fontSize: "12px", fontWeight: 500, letterSpacing: "1.5px", textTransform: "uppercase", color: "#8B7355", marginTop: "20px" }}>
-              Headstrong — Brain-first sports nutrition for contact sport athletes
+              Headstrong — Brain-first sports nutrition for athletes
             </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
