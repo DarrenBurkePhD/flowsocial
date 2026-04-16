@@ -102,7 +102,7 @@ export default function Home() {
             {
               num: "01",
               title: "$2,000–$8,000/month retainers",
-              desc: "For content that takes a junior account manager 3 hours to produce. You're paying for overhead, not output. And you're locked in for 6-12 months."
+              desc: "For content that takes a junior account manager 3 hours to produce. You're paying for overhead, not output. And you're locked in for 6-12 months before realizing it."
             },
             {
               num: "02",
@@ -146,7 +146,7 @@ export default function Home() {
         </h2>
         <div className="fs-steps">
           {[
-            { num: "01", title: "Train it on your brand", desc: "Enter your brand name and website. Flow Social reads your site, extracts your voice, your products, your audience, and builds a Brand DNA profile automatically. Three minutes, once.", cls: "fs-step-first" },
+            { num: "01", title: "Train it on your brand", desc: "Enter your brand name and website. Flow Social reads your site, extracts your voice, your products, your audience, and builds a Brand DNA profile automatically.", cls: "fs-step-first" },
             { num: "02", title: "Generate a full week", desc: "One click. Seven days of on-brand captions, hashtags, CTAs, and matched imagery — feed posts, stories, carousels — ready for review in under 30 seconds.", cls: "" },
             { num: "03", title: "Approve and it ships", desc: "Review each post, swap an image, tweak a caption. Hit approve and Flow Social schedules everything to Instagram automatically. Done.", cls: "fs-step-last" },
           ].map((step, i) => (
